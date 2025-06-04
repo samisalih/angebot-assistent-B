@@ -216,7 +216,11 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Customer email sent successfully:", customerEmailResponse.data?.id);
+    if (customerEmailResponse.error) {
+      console.error("Error sending customer email:", customerEmailResponse.error);
+    } else {
+      console.log("Customer email sent successfully:", customerEmailResponse.data?.id);
+    }
 
     // Prepare internal notification email
     const internalEmailData: any = {
@@ -263,16 +267,22 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Send internal notification email
-    console.log('Sending internal notification email...');
+    console.log('Sending internal notification email to 97samisalih@gmail.com...');
     const internalEmailResponse = await resend.emails.send(internalEmailData);
 
-    console.log("Internal email sent successfully:", internalEmailResponse.data?.id);
+    if (internalEmailResponse.error) {
+      console.error("Error sending internal email:", internalEmailResponse.error);
+    } else {
+      console.log("Internal email sent successfully:", internalEmailResponse.data?.id);
+    }
 
     return new Response(JSON.stringify({ 
       success: true, 
       customerEmailId: customerEmailResponse.data?.id,
       internalEmailId: internalEmailResponse.data?.id,
-      pdfAttached: !!pdfAttachment
+      pdfAttached: !!pdfAttachment,
+      customerEmailError: customerEmailResponse.error,
+      internalEmailError: internalEmailResponse.error
     }), {
       status: 200,
       headers: {
