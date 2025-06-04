@@ -1,19 +1,21 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { useQuotes } from '@/hooks/useQuotes';
+import { useQuotes, Quote } from '@/hooks/useQuotes';
 import { FileText, Calendar, User, Download, Eye, Trash2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { QuoteDetail } from '@/components/QuoteDetail';
 
 const Dashboard = () => {
   const { user, profile, signOut } = useAuth();
   const { quotes, loading, deleteQuote } = useQuotes();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -48,6 +50,16 @@ const Dashboard = () => {
         description: `Angebot ${quote.quote_number} wurde erfolgreich heruntergeladen.`,
       });
     }, 2000);
+  };
+
+  const handleViewQuote = (quote: Quote) => {
+    setSelectedQuote(quote);
+    setIsDetailOpen(true);
+  };
+
+  const handleCloseDetail = () => {
+    setIsDetailOpen(false);
+    setSelectedQuote(null);
   };
 
   if (loading) {
@@ -176,6 +188,15 @@ const Dashboard = () => {
                         Erstellt: {new Date(quote.created_at || '').toLocaleDateString('de-DE')}
                       </p>
                       <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => handleViewQuote(quote)}
+                          className="text-digitalwert-primary hover:text-white hover:bg-digitalwert-primary"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Details
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => handleDownloadPDF(quote)}>
                           <Download className="w-4 h-4 mr-1" />
                           PDF
@@ -197,6 +218,12 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      <QuoteDetail 
+        quote={selectedQuote}
+        isOpen={isDetailOpen}
+        onClose={handleCloseDetail}
+      />
     </div>
   );
 };
