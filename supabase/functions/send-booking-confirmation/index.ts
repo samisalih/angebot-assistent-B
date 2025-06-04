@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { Resend } from "npm:resend@2.0.0";
+import { jsPDF } from "npm:jspdf@2.5.1";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -19,6 +20,88 @@ interface BookingConfirmationRequest {
   quoteNumber?: string;
   quoteTitle?: string;
 }
+
+const generateQuotePDF = async (supabase: any, quoteId: string) => {
+  try {
+    // Fetch quote data with items
+    const { data: quoteData, error } = await supabase
+      .from('quotes')
+      .select(`
+        *,
+        quote_items (
+          id,
+          service,
+          description,
+          price
+        )
+      `)
+      .eq('id', quoteId)
+      .single();
+
+    if (error || !quoteData) {
+      console.error('Error fetching quote data:', error);
+      return null;
+    }
+
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.text('DigitalWert', 20, 20);
+    doc.setFontSize(16);
+    doc.text('Angebot', 20, 35);
+    
+    // Quote info
+    doc.setFontSize(12);
+    doc.text(`Angebotsnummer: ${quoteData.quote_number}`, 20, 50);
+    doc.text(`Titel: ${quoteData.title}`, 20, 60);
+    doc.text(`Datum: ${new Date(quoteData.created_at).toLocaleDateString('de-DE')}`, 20, 70);
+    
+    // Items header
+    doc.setFontSize(14);
+    doc.text('Positionen:', 20, 90);
+    
+    let yPos = 105;
+    doc.setFontSize(10);
+    
+    // Table header
+    doc.text('Leistung', 20, yPos);
+    doc.text('Beschreibung', 80, yPos);
+    doc.text('Preis', 150, yPos);
+    yPos += 10;
+    
+    // Draw line under header
+    doc.line(20, yPos - 5, 190, yPos - 5);
+    
+    // Items
+    quoteData.quote_items?.forEach((item: any) => {
+      doc.text(item.service, 20, yPos);
+      doc.text(item.description || '-', 80, yPos);
+      doc.text(`${Number(item.price).toLocaleString('de-DE')} €`, 150, yPos);
+      yPos += 10;
+    });
+    
+    // Total
+    yPos += 10;
+    doc.line(20, yPos - 5, 190, yPos - 5);
+    doc.setFontSize(12);
+    const totalNet = Number(quoteData.total_amount);
+    const vat = Math.round(totalNet * 0.19);
+    const totalGross = totalNet + vat;
+    
+    doc.text(`Nettobetrag: ${totalNet.toLocaleString('de-DE')} €`, 20, yPos);
+    yPos += 10;
+    doc.text(`MwSt. (19%): ${vat.toLocaleString('de-DE')} €`, 20, yPos);
+    yPos += 10;
+    doc.setFontSize(14);
+    doc.text(`Gesamtbetrag: ${totalGross.toLocaleString('de-DE')} €`, 20, yPos);
+    
+    return doc.output('arraybuffer');
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    return null;
+  }
+};
 
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
@@ -38,7 +121,31 @@ const handler = async (req: Request): Promise<Response> => {
       day: 'numeric'
     });
 
-    const emailResponse = await resend.emails.send({
+    // Initialize Supabase client for PDF generation
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get quote ID from booking
+    const { data: bookingData } = await supabase
+      .from('bookings')
+      .select('quote_id')
+      .eq('id', bookingId)
+      .single();
+
+    let pdfAttachment = null;
+    if (bookingData?.quote_id) {
+      const pdfBuffer = await generateQuotePDF(supabase, bookingData.quote_id);
+      if (pdfBuffer) {
+        pdfAttachment = {
+          filename: `Angebot_${quoteNumber || 'Unbekannt'}.pdf`,
+          content: Buffer.from(pdfBuffer).toString('base64'),
+        };
+      }
+    }
+
+    // Send customer confirmation email
+    const customerEmailResponse = await resend.emails.send({
       from: "DigitalWert <onboarding@resend.dev>",
       to: [email],
       subject: "Bestätigung Ihres Beratungstermins - DigitalWert",
@@ -80,9 +187,59 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    // Send internal notification email
+    const internalEmailData: any = {
+      from: "DigitalWert <onboarding@resend.dev>",
+      to: ["sami.salih@digitalwert.de"],
+      subject: `Neue Terminbuchung - ${name}`,
+      html: `
+        <div style="font-family: 'Titillium Web', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&display=swap');
+          </style>
+          
+          <h1 style="color: #1a365d; text-align: center; font-family: 'Titillium Web', Arial, sans-serif; font-weight: 700;">Neue Terminbuchung</h1>
+          
+          <div style="background-color: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0; font-family: 'Titillium Web', Arial, sans-serif;">
+            <h3 style="color: #2d3748; margin-top: 0; font-family: 'Titillium Web', Arial, sans-serif; font-weight: 600;">Kundendaten:</h3>
+            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Name:</strong> ${name}</p>
+            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>E-Mail:</strong> ${email}</p>
+          </div>
+          
+          <div style="background-color: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0; font-family: 'Titillium Web', Arial, sans-serif;">
+            <h3 style="color: #2d3748; margin-top: 0; font-family: 'Titillium Web', Arial, sans-serif; font-weight: 600;">Termindetails:</h3>
+            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Datum:</strong> ${formattedDate}</p>
+            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Uhrzeit:</strong> ${preferredTime} Uhr</p>
+            ${quoteNumber && quoteTitle ? `
+              <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Zugehöriges Angebot:</strong> ${quoteTitle} (${quoteNumber})</p>
+            ` : ''}
+          </div>
+          
+          <p style="font-family: 'Titillium Web', Arial, sans-serif;">Bitte bestätigen Sie den Termin zeitnah beim Kunden.</p>
+          
+          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e2e8f0;">
+          <p style="font-size: 12px; color: #718096; text-align: center; font-family: 'Titillium Web', Arial, sans-serif;">
+            DigitalWert - Automatische Benachrichtigung
+          </p>
+        </div>
+      `,
+    };
 
-    return new Response(JSON.stringify({ success: true, emailId: emailResponse.data?.id }), {
+    // Add PDF attachment if available
+    if (pdfAttachment) {
+      internalEmailData.attachments = [pdfAttachment];
+    }
+
+    const internalEmailResponse = await resend.emails.send(internalEmailData);
+
+    console.log("Customer email sent successfully:", customerEmailResponse);
+    console.log("Internal email sent successfully:", internalEmailResponse);
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      customerEmailId: customerEmailResponse.data?.id,
+      internalEmailId: internalEmailResponse.data?.id 
+    }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
