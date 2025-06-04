@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,7 +54,7 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
   };
 
   return (
-    <Card className="h-[600px] flex flex-col bg-digitalwert-background-light border-digitalwert-background-lighter">
+    <Card className="h-[600px] flex flex-col bg-digitalwert-background border-digitalwert-background-lighter">
       <CardHeader>
         <CardTitle className="text-white">Kostenvoranschlag</CardTitle>
         <p className="text-sm text-slate-400">Angebot Nr.: {quoteNumber}</p>
@@ -72,7 +71,7 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
           ) : (
             <div className="space-y-4">
               {items.map((item) => (
-                <div key={item.id} className="border border-digitalwert-background-lighter bg-digitalwert-background rounded-lg p-4">
+                <div key={item.id} className="border border-digitalwert-background-lighter bg-digitalwert-background-light rounded-lg p-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <h4 className="font-semibold text-white">{item.service}</h4>
@@ -114,15 +113,15 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
               </div>
 
               <div className="grid grid-cols-1 gap-2">
-                <Button onClick={handleDownloadPDF} className="w-full bg-gradient-to-r from-digitalwert-primary to-digitalwert-accent-light hover:from-digitalwert-primary-dark hover:to-digitalwert-primary text-white">
+                <Button onClick={handleDownloadPDF} className="w-full">
                   <Download className="w-4 h-4 mr-2" />
                   PDF herunterladen
                 </Button>
-                <Button variant="outline" onClick={handleSaveQuote} className="w-full border-digitalwert-primary text-digitalwert-primary hover:bg-digitalwert-primary hover:text-white">
+                <Button variant="outline" onClick={handleSaveQuote} className="w-full">
                   <Save className="w-4 h-4 mr-2" />
                   {user ? 'Angebot speichern' : 'Registrieren & speichern'}
                 </Button>
-                <Button variant="outline" onClick={onBooking} className="w-full border-digitalwert-primary text-digitalwert-primary hover:bg-digitalwert-primary hover:text-white">
+                <Button variant="outline" onClick={onBooking} className="w-full">
                   <Calendar className="w-4 h-4 mr-2" />
                   Beratungstermin buchen
                 </Button>

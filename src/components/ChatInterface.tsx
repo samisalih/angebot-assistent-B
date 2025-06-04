@@ -134,7 +134,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
   };
 
   return (
-    <Card className="h-[600px] flex flex-col bg-digitalwert-background-light border-digitalwert-background-lighter">
+    <Card className="h-[600px] flex flex-col bg-digitalwert-background border-digitalwert-background-lighter">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-white">
           <Bot className="w-5 h-5 text-digitalwert-primary" />
@@ -152,7 +152,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 className={`max-w-[80%] p-3 rounded-lg ${
                   message.isBot
                     ? 'bg-digitalwert-background-lighter border border-digitalwert-primary/20 text-slate-200'
-                    : 'bg-gradient-to-r from-digitalwert-primary to-digitalwert-accent-light text-white'
+                    : 'bg-gradient-to-b from-digitalwert-primary-light to-digitalwert-primary text-white'
                 }`}
               >
                 <div className="flex items-start gap-2">
@@ -195,7 +195,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
             placeholder="Beschreiben Sie Ihr Projekt..."
             className="flex-1 bg-digitalwert-background-lighter border-digitalwert-background-lighter text-white placeholder:text-slate-400"
           />
-          <Button onClick={handleSend} className="bg-gradient-to-r from-digitalwert-primary to-digitalwert-accent-light hover:from-digitalwert-primary-dark hover:to-digitalwert-primary text-white">
+          <Button onClick={handleSend}>
             <Send className="w-4 h-4" />
           </Button>
         </div>
