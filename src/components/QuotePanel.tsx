@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,15 +43,7 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
   };
 
   const handleSaveQuote = () => {
-    if (!user) {
-      onSaveQuote();
-      return;
-    }
-    
-    toast({
-      title: "Angebot gespeichert",
-      description: `Angebot ${quoteNumber} wurde in Ihrem Account gespeichert.`,
-    });
+    onSaveQuote();
   };
 
   return (

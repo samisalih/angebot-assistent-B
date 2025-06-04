@@ -1,34 +1,72 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChatInterface } from '@/components/ChatInterface';
 import { QuotePanel } from '@/components/QuotePanel';
 import { Header } from '@/components/Header';
 import { BookingModal } from '@/components/BookingModal';
-import { LoginModal } from '@/components/LoginModal';
-import { AdminPanel } from '@/components/AdminPanel';
+import { useAuth } from '@/hooks/useAuth';
+import { useQuotes } from '@/hooks/useQuotes';
 
 const Index = () => {
   const [quoteItems, setQuoteItems] = useState([]);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [user, setUser] = useState(null);
+  const { user, loading } = useAuth();
+  const { saveQuote } = useQuotes();
+  const navigate = useNavigate();
 
-  const addQuoteItem = (item) => {
+  useEffect(() => {
+    if (loading) return;
+    
+    // Redirect authenticated users to dashboard if they try to access auth page
+    if (user && window.location.pathname === '/auth') {
+      navigate('/');
+    }
+  }, [user, loading, navigate]);
+
+  const addQuoteItem = (item: any) => {
     setQuoteItems(prev => [...prev, { ...item, id: Date.now() }]);
   };
 
-  const removeQuoteItem = (id) => {
+  const removeQuoteItem = (id: number) => {
     setQuoteItems(prev => prev.filter(item => item.id !== id));
   };
+
+  const handleSaveQuote = async () => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    
+    if (quoteItems.length > 0) {
+      await saveQuote(quoteItems);
+      setQuoteItems([]); // Clear items after saving
+    }
+  };
+
+  const handleLoginOpen = () => {
+    navigate('/auth');
+  };
+
+  const handleLogout = () => {
+    // Logout is handled in the header component
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-digitalwert-background via-digitalwert-background-light to-digitalwert-background-lighter flex items-center justify-center">
+        <div className="text-white">Lade Anwendung...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="dark min-h-screen bg-gradient-to-br from-digitalwert-background via-digitalwert-background-light to-digitalwert-background-lighter">
       <Header 
         user={user}
-        onLoginOpen={() => setIsLoginOpen(true)}
-        onAdminOpen={() => setIsAdminOpen(true)}
-        onLogout={() => setUser(null)}
+        onLoginOpen={handleLoginOpen}
+        onAdminOpen={() => navigate('/dashboard')}
+        onLogout={handleLogout}
       />
       
       <div className="container mx-auto px-4 py-8">
@@ -49,7 +87,7 @@ const Index = () => {
             items={quoteItems}
             onRemoveItem={removeQuoteItem}
             onBooking={() => setIsBookingOpen(true)}
-            onSaveQuote={() => user ? null : setIsLoginOpen(true)}
+            onSaveQuote={handleSaveQuote}
             user={user}
           />
         </div>
@@ -58,17 +96,6 @@ const Index = () => {
       <BookingModal 
         isOpen={isBookingOpen}
         onClose={() => setIsBookingOpen(false)}
-      />
-
-      <LoginModal
-        isOpen={isLoginOpen}
-        onClose={() => setIsLoginOpen(false)}
-        onLogin={setUser}
-      />
-
-      <AdminPanel
-        isOpen={isAdminOpen}
-        onClose={() => setIsAdminOpen(false)}
       />
     </div>
   );

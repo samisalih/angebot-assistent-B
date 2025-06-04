@@ -1,6 +1,8 @@
 
 import { Button } from '@/components/ui/button';
-import { Settings, User, LogOut } from 'lucide-react';
+import { Settings, User, LogOut, BarChart3 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   user: any;
@@ -10,6 +12,14 @@ interface HeaderProps {
 }
 
 export function Header({ user, onLoginOpen, onAdminOpen, onLogout }: HeaderProps) {
+  const { signOut, profile } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/');
+  };
+
   return (
     <header className="bg-digitalwert-background-light/80 backdrop-blur-sm shadow-lg border-b border-digitalwert-background-lighter">
       <div className="container mx-auto px-4 py-4">
@@ -29,21 +39,38 @@ export function Header({ user, onLoginOpen, onAdminOpen, onLogout }: HeaderProps
           <div className="flex items-center space-x-4">
             {user ? (
               <>
-                <span className="text-sm text-slate-300">Willkommen, {user.name}</span>
-                <Button variant="ghost" size="sm" onClick={onLogout} className="text-slate-300 hover:text-white hover:bg-digitalwert-background-lighter">
+                <span className="text-sm text-slate-300">
+                  Willkommen, {profile?.full_name || user.email}
+                </span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => navigate('/dashboard')}
+                  className="text-slate-300 hover:text-white hover:bg-digitalwert-background-lighter"
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Dashboard
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleLogout} 
+                  className="text-slate-300 hover:text-white hover:bg-digitalwert-background-lighter"
+                >
                   <LogOut className="w-4 h-4 mr-2" />
                   Abmelden
                 </Button>
               </>
             ) : (
-              <Button variant="outline" onClick={onLoginOpen} className="border-digitalwert-primary text-digitalwert-primary hover:bg-digitalwert-primary hover:text-white">
+              <Button 
+                variant="outline" 
+                onClick={onLoginOpen} 
+                className="border-digitalwert-primary text-digitalwert-primary hover:bg-digitalwert-primary hover:text-white"
+              >
                 <User className="w-4 h-4 mr-2" />
                 Anmelden
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={onAdminOpen} className="text-slate-300 hover:text-white hover:bg-digitalwert-background-lighter">
-              <Settings className="w-4 h-4" />
-            </Button>
           </div>
         </div>
       </div>
