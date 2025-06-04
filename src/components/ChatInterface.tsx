@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -135,10 +134,10 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
   };
 
   return (
-    <Card className="h-[600px] flex flex-col">
+    <Card className="h-[600px] flex flex-col bg-digitalwert-background-light border-digitalwert-background-lighter">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="w-5 h-5 text-blue-600" />
+        <CardTitle className="flex items-center gap-2 text-white">
+          <Bot className="w-5 h-5 text-digitalwert-primary" />
           KI-Berater Chat
         </CardTitle>
       </CardHeader>
@@ -152,13 +151,13 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
               <div
                 className={`max-w-[80%] p-3 rounded-lg ${
                   message.isBot
-                    ? 'bg-blue-50 text-blue-900 border border-blue-200'
-                    : 'bg-slate-800 text-white'
+                    ? 'bg-digitalwert-background-lighter border border-digitalwert-primary/20 text-slate-200'
+                    : 'bg-gradient-to-r from-digitalwert-primary to-digitalwert-accent-light text-white'
                 }`}
               >
                 <div className="flex items-start gap-2">
                   {message.isBot ? (
-                    <Bot className="w-4 h-4 mt-1 text-blue-600" />
+                    <Bot className="w-4 h-4 mt-1 text-digitalwert-primary" />
                   ) : (
                     <User className="w-4 h-4 mt-1" />
                   )}
@@ -174,13 +173,13 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
           ))}
           {isTyping && (
             <div className="flex justify-start">
-              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+              <div className="bg-digitalwert-background-lighter border border-digitalwert-primary/20 p-3 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-blue-600" />
+                  <Bot className="w-4 h-4 text-digitalwert-primary" />
                   <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
               </div>
@@ -194,9 +193,9 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Beschreiben Sie Ihr Projekt..."
-            className="flex-1"
+            className="flex-1 bg-digitalwert-background-lighter border-digitalwert-background-lighter text-white placeholder:text-slate-400"
           />
-          <Button onClick={handleSend}>
+          <Button onClick={handleSend} className="bg-gradient-to-r from-digitalwert-primary to-digitalwert-accent-light hover:from-digitalwert-primary-dark hover:to-digitalwert-primary text-white">
             <Send className="w-4 h-4" />
           </Button>
         </div>
