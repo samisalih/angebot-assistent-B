@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -274,7 +273,7 @@ serve(async (req) => {
     // Prepare internal notification email using verified resend.dev domain
     const internalEmailData: any = {
       from: 'Digitalwert Booking System <onboarding@resend.dev>',
-      to: ['97samisalih@gmail.com'],
+      to: ['me@samisalih.com'], // Changed from 97samisalih@gmail.com to me@samisalih.com
       subject: `🔔 Neue Terminanfrage - ${sanitizedData.service}`,
       html: `
         <!DOCTYPE html>
@@ -368,7 +367,7 @@ serve(async (req) => {
     };
 
     // Send internal notification email
-    console.log('Sending internal notification email to 97samisalih@gmail.com...');
+    console.log('Sending internal notification email to me@samisalih.com...');
     const internalEmailResponse = await resend.emails.send(internalEmailData);
 
     if (internalEmailResponse.error) {
