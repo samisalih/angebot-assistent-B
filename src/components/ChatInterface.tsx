@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Bot, User } from 'lucide-react';
 
 interface Message {
@@ -135,59 +136,61 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
 
   return (
     <Card className="h-[600px] flex flex-col bg-digitalwert-background border-digitalwert-background-lighter">
-      <CardHeader>
+      <CardHeader className="flex-shrink-0">
         <CardTitle className="flex items-center gap-2 text-white">
           <Bot className="w-5 h-5 text-digitalwert-primary" />
           KI-Berater Chat
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
-            >
+      <CardContent className="flex-1 flex flex-col min-h-0">
+        <ScrollArea className="flex-1 pr-4">
+          <div className="space-y-4 pb-4">
+            {messages.map((message) => (
               <div
-                className={`max-w-[80%] p-3 rounded-lg ${
-                  message.isBot
-                    ? 'bg-digitalwert-background-lighter border border-digitalwert-primary/20 text-slate-200'
-                    : 'bg-gradient-to-b from-digitalwert-primary-light to-digitalwert-primary text-white'
-                }`}
+                key={message.id}
+                className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
               >
-                <div className="flex items-start gap-2">
-                  {message.isBot ? (
-                    <Bot className="w-4 h-4 mt-1 text-digitalwert-primary" />
-                  ) : (
-                    <User className="w-4 h-4 mt-1" />
-                  )}
-                  <div className="flex-1">
-                    <p className="whitespace-pre-line">{message.text}</p>
-                    <p className="text-xs opacity-70 mt-1">
-                      {message.timestamp.toLocaleTimeString()}
-                    </p>
+                <div
+                  className={`max-w-[80%] p-3 rounded-lg ${
+                    message.isBot
+                      ? 'bg-digitalwert-background-lighter border border-digitalwert-primary/20 text-slate-200'
+                      : 'bg-gradient-to-b from-digitalwert-primary-light to-digitalwert-primary text-white'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {message.isBot ? (
+                      <Bot className="w-4 h-4 mt-1 text-digitalwert-primary flex-shrink-0" />
+                    ) : (
+                      <User className="w-4 h-4 mt-1 flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="whitespace-pre-line break-words">{message.text}</p>
+                      <p className="text-xs opacity-70 mt-1">
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="bg-digitalwert-background-lighter border border-digitalwert-primary/20 p-3 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-digitalwert-primary" />
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            ))}
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="bg-digitalwert-background-lighter border border-digitalwert-primary/20 p-3 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-digitalwert-primary" />
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-        <div className="flex gap-2">
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+        <div className="flex gap-2 mt-4 flex-shrink-0">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
