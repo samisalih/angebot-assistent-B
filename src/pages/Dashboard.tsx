@@ -8,6 +8,7 @@ import { FileText, Calendar, User, Download, Eye, Trash2, ArrowLeft } from 'luci
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { QuoteDetail } from '@/components/QuoteDetail';
+import { BookingModal } from '@/components/BookingModal';
 
 const Dashboard = () => {
   const { user, profile, signOut } = useAuth();
@@ -16,6 +17,7 @@ const Dashboard = () => {
   const { toast } = useToast();
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -60,6 +62,14 @@ const Dashboard = () => {
   const handleCloseDetail = () => {
     setIsDetailOpen(false);
     setSelectedQuote(null);
+  };
+
+  const handleBooking = () => {
+    setIsBookingOpen(true);
+  };
+
+  const handleCloseBooking = () => {
+    setIsBookingOpen(false);
   };
 
   if (loading) {
@@ -204,6 +214,15 @@ const Dashboard = () => {
                         <Button 
                           size="sm" 
                           variant="outline" 
+                          onClick={handleBooking}
+                          className="text-digitalwert-primary hover:text-white hover:bg-digitalwert-primary"
+                        >
+                          <Calendar className="w-4 h-4 mr-1" />
+                          Termin
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
                           className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
                           onClick={() => deleteQuote(quote.id!)}
                         >
@@ -223,6 +242,11 @@ const Dashboard = () => {
         quote={selectedQuote}
         isOpen={isDetailOpen}
         onClose={handleCloseDetail}
+      />
+
+      <BookingModal 
+        isOpen={isBookingOpen}
+        onClose={handleCloseBooking}
       />
     </div>
   );

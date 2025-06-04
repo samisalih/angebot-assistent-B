@@ -9,6 +9,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Clock, User, Mail, Phone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -24,13 +26,15 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
     phone: '',
     message: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const availableTimes = [
     '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedDate || !selectedTime || !formData.name || !formData.email) {
@@ -42,16 +46,61 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
       return;
     }
 
-    toast({
-      title: "Termin gebucht!",
-      description: `Ihr Beratungstermin am ${selectedDate.toLocaleDateString('de-DE')} um ${selectedTime} Uhr wurde bestätigt. Sie erhalten eine Bestätigungsmail.`,
-    });
+    if (!user) {
+      toast({
+        title: "Fehler",
+        description: "Sie müssen angemeldet sein, um einen Termin zu buchen.",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    // Reset form
-    setSelectedDate(undefined);
-    setSelectedTime('');
-    setFormData({ name: '', email: '', phone: '', message: '' });
-    onClose();
+    setIsSubmitting(true);
+
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .insert({
+          user_id: user.id,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || null,
+          message: formData.message || null,
+          preferred_date: selectedDate.toISOString().split('T')[0],
+          preferred_time: selectedTime,
+          status: 'pending'
+        });
+
+      if (error) {
+        console.error('Error creating booking:', error);
+        toast({
+          title: "Fehler",
+          description: "Es gab einen Fehler beim Buchen des Termins. Bitte versuchen Sie es erneut.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      toast({
+        title: "Termin gebucht!",
+        description: `Ihr Beratungstermin am ${selectedDate.toLocaleDateString('de-DE')} um ${selectedTime} Uhr wurde bestätigt. Sie erhalten eine Bestätigungsmail.`,
+      });
+
+      // Reset form
+      setSelectedDate(undefined);
+      setSelectedTime('');
+      setFormData({ name: '', email: '', phone: '', message: '' });
+      onClose();
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      toast({
+        title: "Fehler",
+        description: "Ein unerwarteter Fehler ist aufgetreten.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isDateAvailable = (date: Date) => {
@@ -189,11 +238,11 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Abbrechen
             </Button>
-            <Button type="submit">
-              Termin bestätigen
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Wird gebucht...' : 'Termin bestätigen'}
             </Button>
           </div>
         </form>
