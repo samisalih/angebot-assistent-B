@@ -169,10 +169,10 @@ serve(async (req) => {
       </tr>
     `).join('');
 
-    // Send customer confirmation email
+    // Send customer confirmation email using verified resend.dev domain
     console.log('Sending customer confirmation email...');
     const customerEmailResponse = await resend.emails.send({
-      from: 'Digitalwert <noreply@digitalwert.de>',
+      from: 'Digitalwert <onboarding@resend.dev>',
       to: [sanitizedData.customerEmail],
       subject: `Terminbestätigung - ${sanitizedData.service}`,
       html: `
@@ -271,9 +271,9 @@ serve(async (req) => {
       console.log("Customer email sent successfully:", customerEmailResponse.data?.id);
     }
 
-    // Prepare internal notification email
+    // Prepare internal notification email using verified resend.dev domain
     const internalEmailData: any = {
-      from: 'Digitalwert Booking System <noreply@digitalwert.de>',
+      from: 'Digitalwert Booking System <onboarding@resend.dev>',
       to: ['97samisalih@gmail.com'],
       subject: `🔔 Neue Terminanfrage - ${sanitizedData.service}`,
       html: `
