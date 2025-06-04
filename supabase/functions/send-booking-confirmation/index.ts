@@ -221,7 +221,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Prepare internal notification email
     const internalEmailData: any = {
       from: "DigitalWert <onboarding@resend.dev>",
-      to: ["sami.salih@digitalwert.de"],
+      to: ["97samisalih@gmail.com"],
       subject: `Neue Terminbuchung - ${name}`,
       html: `
         <div style="font-family: 'Titillium Web', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
