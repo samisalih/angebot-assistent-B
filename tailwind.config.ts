@@ -19,6 +19,9 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				sans: ['Titillium Web', 'sans-serif'],
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -65,9 +68,15 @@ export default {
 				},
 				// Digitalwert brand colors
 				digitalwert: {
-					blue: '#2563eb',
-					purple: '#7c3aed',
-					gradient: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)'
+					primary: '#BF16AC',
+					'primary-light': '#D946B8',
+					'primary-dark': '#A3148A',
+					background: '#0f1923',
+					'background-light': '#1a2332',
+					'background-lighter': '#2a3441',
+					accent: '#BF16AC',
+					'accent-light': '#E879D3',
+					gradient: 'linear-gradient(135deg, #BF16AC 0%, #D946B8 50%, #E879D3 100%)'
 				}
 			},
 			borderRadius: {

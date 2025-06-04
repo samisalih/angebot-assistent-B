@@ -23,7 +23,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="dark min-h-screen bg-gradient-to-br from-digitalwert-background via-digitalwert-background-light to-digitalwert-background-lighter">
       <Header 
         user={user}
         onLoginOpen={() => setIsLoginOpen(true)}
@@ -33,10 +33,10 @@ const Index = () => {
       
       <div className="container mx-auto px-4 py-8">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-slate-800 mb-4">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-digitalwert-primary via-digitalwert-primary-light to-digitalwert-accent-light bg-clip-text text-transparent mb-4">
             Digitalwert - KI-Beratung
           </h1>
-          <p className="text-xl text-slate-600 max-w-3xl mx-auto">
+          <p className="text-xl text-slate-300 max-w-3xl mx-auto">
             Lassen Sie sich von unserer KI zu Webauftritten, Rebrandings, UI Design und 
             technischer Realisierung von Shop-Websites beraten. Erhalten Sie sofort ein 
             detailliertes Angebot.
