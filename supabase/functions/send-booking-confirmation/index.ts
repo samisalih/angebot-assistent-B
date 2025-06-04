@@ -21,8 +21,20 @@ interface BookingConfirmationRequest {
   quoteTitle?: string;
 }
 
+// Helper function to convert ArrayBuffer to base64 (Deno compatible)
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 const generateQuotePDF = async (supabase: any, quoteId: string) => {
   try {
+    console.log('Starting PDF generation for quote:', quoteId);
+    
     // Fetch quote data with items
     const { data: quoteData, error } = await supabase
       .from('quotes')
@@ -42,6 +54,8 @@ const generateQuotePDF = async (supabase: any, quoteId: string) => {
       console.error('Error fetching quote data:', error);
       return null;
     }
+
+    console.log('Quote data fetched successfully:', quoteData.quote_number);
 
     const doc = new jsPDF();
     
@@ -96,7 +110,12 @@ const generateQuotePDF = async (supabase: any, quoteId: string) => {
     doc.setFontSize(14);
     doc.text(`Gesamtbetrag: ${totalGross.toLocaleString('de-DE')} €`, 20, yPos);
     
-    return doc.output('arraybuffer');
+    // Generate PDF as ArrayBuffer and convert to base64
+    const pdfArrayBuffer = doc.output('arraybuffer');
+    const base64String = arrayBufferToBase64(pdfArrayBuffer);
+    
+    console.log('PDF generated successfully, size:', base64String.length);
+    return base64String;
   } catch (error) {
     console.error('Error generating PDF:', error);
     return null;
@@ -112,7 +131,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { bookingId, name, email, preferredDate, preferredTime, quoteNumber, quoteTitle }: BookingConfirmationRequest = await req.json();
 
-    console.log('Sending booking confirmation email to:', email);
+    console.log('Processing booking confirmation for:', email, 'Booking ID:', bookingId);
 
     const formattedDate = new Date(preferredDate).toLocaleDateString('de-DE', {
       weekday: 'long',
@@ -127,24 +146,34 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get quote ID from booking
-    const { data: bookingData } = await supabase
+    const { data: bookingData, error: bookingError } = await supabase
       .from('bookings')
       .select('quote_id')
       .eq('id', bookingId)
       .single();
 
+    if (bookingError) {
+      console.error('Error fetching booking data:', bookingError);
+    }
+
+    // Generate PDF attachment if quote exists
     let pdfAttachment = null;
     if (bookingData?.quote_id) {
-      const pdfBuffer = await generateQuotePDF(supabase, bookingData.quote_id);
-      if (pdfBuffer) {
+      console.log('Generating PDF for quote ID:', bookingData.quote_id);
+      const pdfBase64 = await generateQuotePDF(supabase, bookingData.quote_id);
+      if (pdfBase64) {
         pdfAttachment = {
           filename: `Angebot_${quoteNumber || 'Unbekannt'}.pdf`,
-          content: Buffer.from(pdfBuffer).toString('base64'),
+          content: pdfBase64,
         };
+        console.log('PDF attachment created successfully');
+      } else {
+        console.log('PDF generation failed, proceeding without attachment');
       }
     }
 
     // Send customer confirmation email
+    console.log('Sending customer confirmation email...');
     const customerEmailResponse = await resend.emails.send({
       from: "DigitalWert <onboarding@resend.dev>",
       to: [email],
@@ -187,7 +216,9 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    // Send internal notification email
+    console.log("Customer email sent successfully:", customerEmailResponse.data?.id);
+
+    // Prepare internal notification email
     const internalEmailData: any = {
       from: "DigitalWert <onboarding@resend.dev>",
       to: ["sami.salih@digitalwert.de"],
@@ -228,17 +259,20 @@ const handler = async (req: Request): Promise<Response> => {
     // Add PDF attachment if available
     if (pdfAttachment) {
       internalEmailData.attachments = [pdfAttachment];
+      console.log('Added PDF attachment to internal email');
     }
 
+    // Send internal notification email
+    console.log('Sending internal notification email...');
     const internalEmailResponse = await resend.emails.send(internalEmailData);
 
-    console.log("Customer email sent successfully:", customerEmailResponse);
-    console.log("Internal email sent successfully:", internalEmailResponse);
+    console.log("Internal email sent successfully:", internalEmailResponse.data?.id);
 
     return new Response(JSON.stringify({ 
       success: true, 
       customerEmailId: customerEmailResponse.data?.id,
-      internalEmailId: internalEmailResponse.data?.id 
+      internalEmailId: internalEmailResponse.data?.id,
+      pdfAttached: !!pdfAttachment
     }), {
       status: 200,
       headers: {
