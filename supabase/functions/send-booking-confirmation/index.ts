@@ -42,30 +42,34 @@ const handler = async (req: Request): Promise<Response> => {
       to: [email],
       subject: "Bestätigung Ihres Beratungstermins - DigitalWert",
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #1a365d; text-align: center;">Terminbestätigung</h1>
+        <div style="font-family: 'Titillium Web', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&display=swap');
+          </style>
           
-          <p>Liebe(r) ${name},</p>
+          <h1 style="color: #1a365d; text-align: center; font-family: 'Titillium Web', Arial, sans-serif; font-weight: 700;">Terminbestätigung</h1>
           
-          <p>vielen Dank für Ihre Terminanfrage! Wir haben Ihren gewünschten Beratungstermin erhalten und werden uns schnellstmöglich bei Ihnen melden, um den Termin zu bestätigen.</p>
+          <p style="font-family: 'Titillium Web', Arial, sans-serif;">Liebe(r) ${name},</p>
           
-          <div style="background-color: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="color: #2d3748; margin-top: 0;">Ihre Termindetails:</h3>
-            <p><strong>Datum:</strong> ${formattedDate}</p>
-            <p><strong>Uhrzeit:</strong> ${preferredTime} Uhr</p>
-            <p><strong>Dauer:</strong> ca. 60 Minuten</p>
-            ${message ? `<p><strong>Ihre Nachricht:</strong> ${message}</p>` : ''}
+          <p style="font-family: 'Titillium Web', Arial, sans-serif;">vielen Dank für Ihre Terminanfrage! Wir haben Ihren gewünschten Beratungstermin erhalten und werden uns schnellstmöglich bei Ihnen melden, um den Termin zu bestätigen.</p>
+          
+          <div style="background-color: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0; font-family: 'Titillium Web', Arial, sans-serif;">
+            <h3 style="color: #2d3748; margin-top: 0; font-family: 'Titillium Web', Arial, sans-serif; font-weight: 600;">Ihre Termindetails:</h3>
+            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Datum:</strong> ${formattedDate}</p>
+            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Uhrzeit:</strong> ${preferredTime} Uhr</p>
+            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Dauer:</strong> ca. 60 Minuten</p>
+            ${message ? `<p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Ihre Nachricht:</strong> ${message}</p>` : ''}
           </div>
           
-          <p>Wir werden Sie in Kürze kontaktieren, um den Termin zu bestätigen und weitere Details zu besprechen.</p>
+          <p style="font-family: 'Titillium Web', Arial, sans-serif;">Wir werden Sie in Kürze kontaktieren, um den Termin zu bestätigen und weitere Details zu besprechen.</p>
           
-          <p>Bei Fragen oder Änderungen können Sie uns jederzeit kontaktieren.</p>
+          <p style="font-family: 'Titillium Web', Arial, sans-serif;">Bei Fragen oder Änderungen können Sie uns jederzeit kontaktieren.</p>
           
-          <p>Freundliche Grüße,<br>
+          <p style="font-family: 'Titillium Web', Arial, sans-serif;">Freundliche Grüße,<br>
           Ihr DigitalWert Team</p>
           
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #e2e8f0;">
-          <p style="font-size: 12px; color: #718096; text-align: center;">
+          <p style="font-size: 12px; color: #718096; text-align: center; font-family: 'Titillium Web', Arial, sans-serif;">
             DigitalWert - Ihr Partner für digitale Lösungen<br>
             Diese E-Mail wurde automatisch generiert.
           </p>
