@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -193,7 +192,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
           <Bot className="w-5 h-5 text-digitalwert-primary" />
           KI-Berater Chat
           {isRateLimited && (
-            <AlertTriangle className="w-4 h-4 text-yellow-500" title="Rate limit erreicht" />
+            <AlertTriangle className="w-4 h-4 text-yellow-500" />
           )}
         </CardTitle>
       </CardHeader>
