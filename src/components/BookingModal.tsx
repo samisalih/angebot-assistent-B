@@ -58,7 +58,8 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
+      // Insert booking into database
+      const { data: bookingData, error } = await supabase
         .from('bookings')
         .insert({
           user_id: user.id,
@@ -69,7 +70,9 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
           preferred_date: selectedDate.toISOString().split('T')[0],
           preferred_time: selectedTime,
           status: 'pending'
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('Error creating booking:', error);
@@ -81,10 +84,39 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
         return;
       }
 
-      toast({
-        title: "Termin gebucht!",
-        description: `Ihr Beratungstermin am ${selectedDate.toLocaleDateString('de-DE')} um ${selectedTime} Uhr wurde bestätigt. Sie erhalten eine Bestätigungsmail.`,
-      });
+      // Send confirmation email
+      try {
+        const { error: emailError } = await supabase.functions.invoke('send-booking-confirmation', {
+          body: {
+            bookingId: bookingData.id,
+            name: formData.name,
+            email: formData.email,
+            preferredDate: selectedDate.toISOString().split('T')[0],
+            preferredTime: selectedTime,
+            message: formData.message
+          }
+        });
+
+        if (emailError) {
+          console.error('Error sending email:', emailError);
+          // Don't fail the booking if email fails, just log it
+          toast({
+            title: "Termin gebucht!",
+            description: `Ihr Beratungstermin am ${selectedDate.toLocaleDateString('de-DE')} um ${selectedTime} Uhr wurde bestätigt. (E-Mail-Versand fehlgeschlagen)`,
+          });
+        } else {
+          toast({
+            title: "Termin gebucht!",
+            description: `Ihr Beratungstermin am ${selectedDate.toLocaleDateString('de-DE')} um ${selectedTime} Uhr wurde bestätigt. Sie erhalten eine Bestätigungsmail.`,
+          });
+        }
+      } catch (emailError) {
+        console.error('Error sending confirmation email:', emailError);
+        toast({
+          title: "Termin gebucht!",
+          description: `Ihr Beratungstermin am ${selectedDate.toLocaleDateString('de-DE')} um ${selectedTime} Uhr wurde bestätigt. (E-Mail-Versand fehlgeschlagen)`,
+        });
+      }
 
       // Reset form
       setSelectedDate(undefined);
