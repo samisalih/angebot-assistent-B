@@ -49,9 +49,21 @@ export function useQuotes() {
 
       if (error) throw error;
 
-      const formattedQuotes = quotesData?.map(quote => ({
-        ...quote,
-        items: quote.quote_items || []
+      // Transform database data to match our Quote interface
+      const formattedQuotes: Quote[] = quotesData?.map(quote => ({
+        id: quote.id,
+        quote_number: quote.quote_number,
+        title: quote.title || 'Angebot',
+        status: (quote.status as 'draft' | 'sent' | 'accepted' | 'rejected') || 'draft',
+        total_amount: Number(quote.total_amount),
+        items: quote.quote_items?.map(item => ({
+          id: item.id,
+          service: item.service,
+          description: item.description || '',
+          price: Number(item.price)
+        })) || [],
+        created_at: quote.created_at || undefined,
+        updated_at: quote.updated_at || undefined
       })) || [];
 
       setQuotes(formattedQuotes);
