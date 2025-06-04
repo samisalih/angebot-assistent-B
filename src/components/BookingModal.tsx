@@ -41,10 +41,10 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedDate || !selectedTime || !formData.name || !formData.email) {
+    if (!selectedDate || !selectedTime || !formData.name || !formData.email || !selectedQuoteId) {
       toast({
         title: "Fehler",
-        description: "Bitte füllen Sie alle Pflichtfelder aus.",
+        description: "Bitte füllen Sie alle Pflichtfelder aus und wählen Sie ein Angebot.",
         variant: "destructive"
       });
       return;
@@ -70,7 +70,7 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
           name: formData.name,
           email: formData.email,
           phone: formData.phone || null,
-          quote_id: selectedQuoteId || null,
+          quote_id: selectedQuoteId,
           preferred_date: selectedDate.toISOString().split('T')[0],
           preferred_time: selectedTime,
           status: 'pending'
@@ -241,12 +241,12 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
               </div>
 
               <div>
-                <Label htmlFor="quote">Zugehöriges Angebot</Label>
-                <Select value={selectedQuoteId} onValueChange={setSelectedQuoteId}>
+                <Label htmlFor="quote">Angebot *</Label>
+                <Select value={selectedQuoteId} onValueChange={setSelectedQuoteId} required>
                   <SelectTrigger className="w-full">
                     <div className="flex items-center">
                       <FileText className="w-4 h-4 mr-2 text-slate-400" />
-                      <SelectValue placeholder="Angebot auswählen (optional)" />
+                      <SelectValue placeholder="Angebot auswählen" />
                     </div>
                   </SelectTrigger>
                   <SelectContent className="bg-white z-50">
