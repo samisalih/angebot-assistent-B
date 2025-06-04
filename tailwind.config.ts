@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,12 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Digitalwert brand colors
+				digitalwert: {
+					blue: '#2563eb',
+					purple: '#7c3aed',
+					gradient: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)'
 				}
 			},
 			borderRadius: {
@@ -84,11 +91,22 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				bounce: {
+					'0%, 100%': {
+						transform: 'translateY(-25%)',
+						animationTimingFunction: 'cubic-bezier(0.8, 0, 1, 1)'
+					},
+					'50%': {
+						transform: 'translateY(0)',
+						animationTimingFunction: 'cubic-bezier(0, 0, 0.2, 1)'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				bounce: 'bounce 1s infinite'
 			}
 		}
 	},
