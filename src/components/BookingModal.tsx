@@ -3,13 +3,14 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
-import { Clock, User, Mail, Phone } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Clock, User, Mail, Phone, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuotes } from '@/hooks/useQuotes';
 import { supabase } from '@/integrations/supabase/client';
 
 interface BookingModalProps {
@@ -20,19 +21,22 @@ interface BookingModalProps {
 export function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState('');
+  const [selectedQuoteId, setSelectedQuoteId] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: '',
-    message: ''
+    phone: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { quotes } = useQuotes();
 
   const availableTimes = [
     '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'
   ];
+
+  const selectedQuote = quotes.find(quote => quote.id === selectedQuoteId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +70,7 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
           name: formData.name,
           email: formData.email,
           phone: formData.phone || null,
-          message: formData.message || null,
+          quote_id: selectedQuoteId || null,
           preferred_date: selectedDate.toISOString().split('T')[0],
           preferred_time: selectedTime,
           status: 'pending'
@@ -93,7 +97,8 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
             email: formData.email,
             preferredDate: selectedDate.toISOString().split('T')[0],
             preferredTime: selectedTime,
-            message: formData.message
+            quoteNumber: selectedQuote?.quote_number,
+            quoteTitle: selectedQuote?.title
           }
         });
 
@@ -121,7 +126,8 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
       // Reset form
       setSelectedDate(undefined);
       setSelectedTime('');
-      setFormData({ name: '', email: '', phone: '', message: '' });
+      setSelectedQuoteId('');
+      setFormData({ name: '', email: '', phone: '' });
       onClose();
     } catch (error) {
       console.error('Unexpected error:', error);
@@ -235,21 +241,57 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
               </div>
 
               <div>
-                <Label htmlFor="message">Nachricht</Label>
-                <Textarea
-                  id="message"
-                  value={formData.message}
-                  onChange={(e) => setFormData(prev => ({ ...prev, message: e.target.value }))}
-                  placeholder="Beschreiben Sie kurz Ihr Projekt oder Ihre Fragen..."
-                  rows={4}
-                />
+                <Label htmlFor="quote">Zugehöriges Angebot</Label>
+                <Select value={selectedQuoteId} onValueChange={setSelectedQuoteId}>
+                  <SelectTrigger className="w-full">
+                    <div className="flex items-center">
+                      <FileText className="w-4 h-4 mr-2 text-slate-400" />
+                      <SelectValue placeholder="Angebot auswählen (optional)" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-white z-50">
+                    {quotes.length === 0 ? (
+                      <SelectItem value="no-quotes" disabled>
+                        Keine Angebote verfügbar
+                      </SelectItem>
+                    ) : (
+                      quotes.map((quote) => (
+                        <SelectItem key={quote.id} value={quote.id!}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{quote.title}</span>
+                            <span className="text-sm text-slate-500">
+                              #{quote.quote_number} - {Number(quote.total_amount).toLocaleString('de-DE')} €
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
 
-              {selectedDate && selectedTime && (
+              {selectedQuote && (
                 <Card className="bg-blue-50 border-blue-200">
                   <CardContent className="p-4">
-                    <h4 className="font-semibold text-blue-800 mb-2">Terminübersicht</h4>
+                    <h4 className="font-semibold text-blue-800 mb-2">Ausgewähltes Angebot</h4>
                     <p className="text-sm text-blue-700">
+                      <strong>Titel:</strong> {selectedQuote.title}
+                    </p>
+                    <p className="text-sm text-blue-700">
+                      <strong>Angebotsnummer:</strong> {selectedQuote.quote_number}
+                    </p>
+                    <p className="text-sm text-blue-700">
+                      <strong>Gesamtbetrag:</strong> {Number(selectedQuote.total_amount).toLocaleString('de-DE')} €
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {selectedDate && selectedTime && (
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="p-4">
+                    <h4 className="font-semibold text-green-800 mb-2">Terminübersicht</h4>
+                    <p className="text-sm text-green-700">
                       <strong>Datum:</strong> {selectedDate.toLocaleDateString('de-DE', { 
                         weekday: 'long', 
                         year: 'numeric', 
@@ -257,10 +299,10 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
                         day: 'numeric' 
                       })}
                     </p>
-                    <p className="text-sm text-blue-700">
+                    <p className="text-sm text-green-700">
                       <strong>Uhrzeit:</strong> {selectedTime} Uhr
                     </p>
-                    <p className="text-sm text-blue-700">
+                    <p className="text-sm text-green-700">
                       <strong>Dauer:</strong> ca. 60 Minuten
                     </p>
                   </CardContent>

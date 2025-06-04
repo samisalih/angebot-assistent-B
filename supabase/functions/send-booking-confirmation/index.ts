@@ -16,7 +16,8 @@ interface BookingConfirmationRequest {
   email: string;
   preferredDate: string;
   preferredTime: string;
-  message?: string;
+  quoteNumber?: string;
+  quoteTitle?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -26,7 +27,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { bookingId, name, email, preferredDate, preferredTime, message }: BookingConfirmationRequest = await req.json();
+    const { bookingId, name, email, preferredDate, preferredTime, quoteNumber, quoteTitle }: BookingConfirmationRequest = await req.json();
 
     console.log('Sending booking confirmation email to:', email);
 
@@ -58,7 +59,9 @@ const handler = async (req: Request): Promise<Response> => {
             <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Datum:</strong> ${formattedDate}</p>
             <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Uhrzeit:</strong> ${preferredTime} Uhr</p>
             <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Dauer:</strong> ca. 60 Minuten</p>
-            ${message ? `<p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Ihre Nachricht:</strong> ${message}</p>` : ''}
+            ${quoteNumber && quoteTitle ? `
+              <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Bezugnahme auf Angebot:</strong> ${quoteTitle} (${quoteNumber})</p>
+            ` : ''}
           </div>
           
           <p style="font-family: 'Titillium Web', Arial, sans-serif;">Wir werden Sie in Kürze kontaktieren, um den Termin zu bestätigen und weitere Details zu besprechen.</p>
