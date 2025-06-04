@@ -25,7 +25,9 @@ const validateEmail = (email: string): boolean => {
 const validateBookingData = (data: any): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
   
-  if (!data.customerName || data.customerName.trim().length < 2) {
+  console.log('Validating booking data:', JSON.stringify(data, null, 2));
+  
+  if (!data.customerName || typeof data.customerName !== 'string' || data.customerName.trim().length < 2) {
     errors.push('Customer name is required and must be at least 2 characters');
   }
   
@@ -33,11 +35,12 @@ const validateBookingData = (data: any): { isValid: boolean; errors: string[] } 
     errors.push('Valid customer email is required');
   }
   
-  if (!data.customerPhone || data.customerPhone.trim().length < 5) {
-    errors.push('Customer phone is required and must be at least 5 characters');
+  // Phone is optional, but if provided should be valid
+  if (data.customerPhone && typeof data.customerPhone === 'string' && data.customerPhone.trim().length < 5) {
+    errors.push('Customer phone must be at least 5 characters if provided');
   }
   
-  if (!data.service || data.service.trim().length < 2) {
+  if (!data.service || typeof data.service !== 'string' || data.service.trim().length < 2) {
     errors.push('Service is required');
   }
   
@@ -79,6 +82,7 @@ serve(async (req) => {
 
     const requestData = await req.json();
     console.log('Received booking request from IP:', clientIP);
+    console.log('Raw request data:', JSON.stringify(requestData, null, 2));
     
     // Validate and sanitize input data
     const validation = validateBookingData(requestData);
@@ -103,7 +107,7 @@ serve(async (req) => {
     const sanitizedData = {
       customerName: sanitizeInput(requestData.customerName, 100),
       customerEmail: sanitizeInput(requestData.customerEmail, 100),
-      customerPhone: sanitizeInput(requestData.customerPhone, 20),
+      customerPhone: sanitizeInput(requestData.customerPhone || '', 20),
       service: sanitizeInput(requestData.service, 200),
       preferredDate: sanitizeInput(requestData.preferredDate, 50),
       preferredTime: sanitizeInput(requestData.preferredTime || '', 50),
@@ -133,6 +137,7 @@ serve(async (req) => {
     const resend = {
       emails: {
         send: async (emailData: any) => {
+          console.log('Sending email with data:', JSON.stringify(emailData, null, 2));
           const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
@@ -143,6 +148,7 @@ serve(async (req) => {
           });
           
           const data = await response.json();
+          console.log('Resend API response:', response.status, data);
           return { 
             data: response.ok ? data : null, 
             error: response.ok ? null : data 
@@ -370,6 +376,8 @@ serve(async (req) => {
     } else {
       console.log("Internal email sent successfully:", internalEmailResponse.data?.id);
     }
+
+    console.log('Email sending completed. Customer:', customerEmailResponse.error ? 'FAILED' : 'SUCCESS', 'Internal:', internalEmailResponse.error ? 'FAILED' : 'SUCCESS');
 
     return new Response(JSON.stringify({ 
       success: true, 

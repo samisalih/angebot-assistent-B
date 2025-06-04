@@ -88,19 +88,32 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
         return;
       }
 
+      // Prepare data for email sending that matches the edge function validation
+      const emailData = {
+        customerName: formData.name,
+        customerEmail: formData.email,
+        customerPhone: formData.phone || '',
+        service: selectedQuote?.title || 'Beratung',
+        preferredDate: selectedDate.toISOString().split('T')[0],
+        preferredTime: selectedTime,
+        message: `Terminbuchung für Angebot ${selectedQuote?.quote_number}`,
+        totalAmount: selectedQuote?.total_amount || 0,
+        items: selectedQuote ? [{
+          service: selectedQuote.title,
+          description: `Angebot ${selectedQuote.quote_number}`,
+          price: selectedQuote.total_amount
+        }] : []
+      };
+
+      console.log('Sending email data:', emailData);
+
       // Send confirmation email
       try {
-        const { error: emailError } = await supabase.functions.invoke('send-booking-confirmation', {
-          body: {
-            bookingId: bookingData.id,
-            name: formData.name,
-            email: formData.email,
-            preferredDate: selectedDate.toISOString().split('T')[0],
-            preferredTime: selectedTime,
-            quoteNumber: selectedQuote?.quote_number,
-            quoteTitle: selectedQuote?.title
-          }
+        const { data: emailResponse, error: emailError } = await supabase.functions.invoke('send-booking-confirmation', {
+          body: emailData
         });
+
+        console.log('Email function response:', emailResponse);
 
         if (emailError) {
           console.error('Error sending email:', emailError);
