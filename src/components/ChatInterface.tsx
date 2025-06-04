@@ -1,9 +1,10 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User } from 'lucide-react';
+import { Send, Bot, User, AlertTriangle } from 'lucide-react';
 
 interface Message {
   id: number;
@@ -16,6 +17,20 @@ interface ChatInterfaceProps {
   onAddQuoteItem: (item: any) => void;
 }
 
+// Input sanitization function
+const sanitizeInput = (input: string): string => {
+  return input
+    .trim()
+    .replace(/[<>\"'&]/g, '') // Remove potentially dangerous characters
+    .substring(0, 1000); // Limit length to prevent abuse
+};
+
+// Rate limiting configuration
+const RATE_LIMIT = {
+  maxMessages: 10,
+  timeWindow: 60000, // 1 minute
+};
+
 export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -27,6 +42,8 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [messageTimestamps, setMessageTimestamps] = useState<number[]>([]);
+  const [isRateLimited, setIsRateLimited] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -37,11 +54,29 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
     scrollToBottom();
   }, [messages]);
 
+  // Rate limiting check
+  const checkRateLimit = (): boolean => {
+    const now = Date.now();
+    const recentMessages = messageTimestamps.filter(
+      timestamp => now - timestamp < RATE_LIMIT.timeWindow
+    );
+    
+    if (recentMessages.length >= RATE_LIMIT.maxMessages) {
+      setIsRateLimited(true);
+      setTimeout(() => setIsRateLimited(false), RATE_LIMIT.timeWindow);
+      return false;
+    }
+    
+    setMessageTimestamps([...recentMessages, now]);
+    return true;
+  };
+
   const getAIResponse = (userMessage: string) => {
-    const message = userMessage.toLowerCase();
+    // Sanitize the user message before processing
+    const sanitizedMessage = sanitizeInput(userMessage);
+    const message = sanitizedMessage.toLowerCase();
     
     if (message.includes('website') || message.includes('webauftritt')) {
-      // Add quote item for website
       setTimeout(() => {
         onAddQuoteItem({
           service: 'Professioneller Webauftritt',
@@ -97,16 +132,28 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
       return "Unsere Preise sind transparent und fair kalkuliert. Sie sehen alle Positionen live in Ihrem Kostenvoranschlag rechts. Jedes Projekt wird individuell bewertet - sprechen Sie einfach Ihre konkreten Anforderungen an, dann kann ich Ihnen passende Angebote erstellen.";
     }
 
-    // Default response
     return "Das ist eine interessante Anfrage! Können Sie mir mehr Details dazu geben? Je spezifischer Sie Ihre Wünsche beschreiben, desto besser kann ich Ihnen passende Lösungen und Angebote erstellen. Geht es um einen Webauftritt, E-Commerce, Design oder etwas anderes?";
   };
 
   const handleSend = () => {
-    if (!input.trim()) return;
+    const sanitizedInput = sanitizeInput(input);
+    
+    if (!sanitizedInput.trim()) return;
+    
+    if (!checkRateLimit()) {
+      const errorMessage: Message = {
+        id: Date.now(),
+        text: "Sie senden zu viele Nachrichten. Bitte warten Sie einen Moment, bevor Sie eine weitere Nachricht senden.",
+        isBot: true,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now(),
-      text: input,
+      text: sanitizedInput,
       isBot: false,
       timestamp: new Date()
     };
@@ -115,11 +162,10 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
     setInput('');
     setIsTyping(true);
 
-    // Simulate AI response delay
     setTimeout(() => {
       const botResponse: Message = {
         id: Date.now() + 1,
-        text: getAIResponse(input),
+        text: getAIResponse(sanitizedInput),
         isBot: true,
         timestamp: new Date()
       };
@@ -129,9 +175,15 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitizedValue = sanitizeInput(e.target.value);
+    setInput(sanitizedValue);
   };
 
   return (
@@ -140,6 +192,9 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
         <CardTitle className="flex items-center gap-2 text-white">
           <Bot className="w-5 h-5 text-digitalwert-primary" />
           KI-Berater Chat
+          {isRateLimited && (
+            <AlertTriangle className="w-4 h-4 text-yellow-500" title="Rate limit erreicht" />
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0">
@@ -193,15 +248,25 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
         <div className="flex gap-2 mt-4 flex-shrink-0">
           <Input
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyPress={handleKeyPress}
             placeholder="Beschreiben Sie Ihr Projekt..."
             className="flex-1 bg-digitalwert-background-lighter border-digitalwert-background-lighter text-white placeholder:text-slate-400"
+            disabled={isTyping || isRateLimited}
+            maxLength={1000}
           />
-          <Button onClick={handleSend}>
+          <Button 
+            onClick={handleSend} 
+            disabled={isTyping || isRateLimited || !input.trim()}
+          >
             <Send className="w-4 h-4" />
           </Button>
         </div>
+        {isRateLimited && (
+          <p className="text-yellow-500 text-xs mt-2">
+            Rate Limit erreicht. Bitte warten Sie einen Moment.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

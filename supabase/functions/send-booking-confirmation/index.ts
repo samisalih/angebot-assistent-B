@@ -1,218 +1,261 @@
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { Resend } from "npm:resend@2.0.0";
-import { jsPDF } from "npm:jspdf@2.5.1";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface BookingConfirmationRequest {
-  bookingId: string;
-  name: string;
-  email: string;
-  preferredDate: string;
-  preferredTime: string;
-  quoteNumber?: string;
-  quoteTitle?: string;
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'X-XSS-Protection': '1; mode=block',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Content-Security-Policy': "default-src 'self'",
 }
 
-// Helper function to convert ArrayBuffer to base64 (Deno compatible)
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-const generateQuotePDF = async (supabase: any, quoteId: string) => {
-  try {
-    console.log('Starting PDF generation for quote:', quoteId);
-    
-    // Fetch quote data with items
-    const { data: quoteData, error } = await supabase
-      .from('quotes')
-      .select(`
-        *,
-        quote_items (
-          id,
-          service,
-          description,
-          price
-        )
-      `)
-      .eq('id', quoteId)
-      .single();
-
-    if (error || !quoteData) {
-      console.error('Error fetching quote data:', error);
-      return null;
-    }
-
-    console.log('Quote data fetched successfully:', quoteData.quote_number);
-
-    const doc = new jsPDF();
-    
-    // Header
-    doc.setFontSize(20);
-    doc.text('DigitalWert', 20, 20);
-    doc.setFontSize(16);
-    doc.text('Angebot', 20, 35);
-    
-    // Quote info
-    doc.setFontSize(12);
-    doc.text(`Angebotsnummer: ${quoteData.quote_number}`, 20, 50);
-    doc.text(`Titel: ${quoteData.title}`, 20, 60);
-    doc.text(`Datum: ${new Date(quoteData.created_at).toLocaleDateString('de-DE')}`, 20, 70);
-    
-    // Items header
-    doc.setFontSize(14);
-    doc.text('Positionen:', 20, 90);
-    
-    let yPos = 105;
-    doc.setFontSize(10);
-    
-    // Table header
-    doc.text('Leistung', 20, yPos);
-    doc.text('Beschreibung', 80, yPos);
-    doc.text('Preis', 150, yPos);
-    yPos += 10;
-    
-    // Draw line under header
-    doc.line(20, yPos - 5, 190, yPos - 5);
-    
-    // Items
-    quoteData.quote_items?.forEach((item: any) => {
-      doc.text(item.service, 20, yPos);
-      doc.text(item.description || '-', 80, yPos);
-      doc.text(`${Number(item.price).toLocaleString('de-DE')} €`, 150, yPos);
-      yPos += 10;
-    });
-    
-    // Total
-    yPos += 10;
-    doc.line(20, yPos - 5, 190, yPos - 5);
-    doc.setFontSize(12);
-    const totalNet = Number(quoteData.total_amount);
-    const vat = Math.round(totalNet * 0.19);
-    const totalGross = totalNet + vat;
-    
-    doc.text(`Nettobetrag: ${totalNet.toLocaleString('de-DE')} €`, 20, yPos);
-    yPos += 10;
-    doc.text(`MwSt. (19%): ${vat.toLocaleString('de-DE')} €`, 20, yPos);
-    yPos += 10;
-    doc.setFontSize(14);
-    doc.text(`Gesamtbetrag: ${totalGross.toLocaleString('de-DE')} €`, 20, yPos);
-    
-    // Generate PDF as ArrayBuffer and convert to base64
-    const pdfArrayBuffer = doc.output('arraybuffer');
-    const base64String = arrayBufferToBase64(pdfArrayBuffer);
-    
-    console.log('PDF generated successfully, size:', base64String.length);
-    return base64String;
-  } catch (error) {
-    console.error('Error generating PDF:', error);
-    return null;
-  }
+// Input validation and sanitization
+const sanitizeInput = (input: string, maxLength: number = 1000): string => {
+  if (typeof input !== 'string') return '';
+  return input.trim().replace(/[<>\"'&]/g, '').substring(0, maxLength);
 };
 
-const handler = async (req: Request): Promise<Response> => {
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 100;
+};
+
+const validateBookingData = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  if (!data.customerName || data.customerName.trim().length < 2) {
+    errors.push('Customer name is required and must be at least 2 characters');
+  }
+  
+  if (!data.customerEmail || !validateEmail(data.customerEmail)) {
+    errors.push('Valid customer email is required');
+  }
+  
+  if (!data.customerPhone || data.customerPhone.trim().length < 5) {
+    errors.push('Customer phone is required and must be at least 5 characters');
+  }
+  
+  if (!data.service || data.service.trim().length < 2) {
+    errors.push('Service is required');
+  }
+  
+  if (!data.preferredDate) {
+    errors.push('Preferred date is required');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 200 
+    });
   }
 
+  // Rate limiting - simple in-memory store (in production, use Redis or similar)
+  const clientIP = req.headers.get('x-forwarded-for') || 'unknown';
+  
   try {
-    const { bookingId, name, email, preferredDate, preferredTime, quoteNumber, quoteTitle }: BookingConfirmationRequest = await req.json();
-
-    console.log('Processing booking confirmation for:', email, 'Booking ID:', bookingId);
-
-    const formattedDate = new Date(preferredDate).toLocaleDateString('de-DE', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    // Initialize Supabase client for PDF generation
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Get quote ID from booking
-    const { data: bookingData, error: bookingError } = await supabase
-      .from('bookings')
-      .select('quote_id')
-      .eq('id', bookingId)
-      .single();
-
-    if (bookingError) {
-      console.error('Error fetching booking data:', bookingError);
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { 
+          status: 405, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
     }
 
-    // Generate PDF attachment if quote exists
-    let pdfAttachment = null;
-    if (bookingData?.quote_id) {
-      console.log('Generating PDF for quote ID:', bookingData.quote_id);
-      const pdfBase64 = await generateQuotePDF(supabase, bookingData.quote_id);
-      if (pdfBase64) {
-        pdfAttachment = {
-          filename: `Angebot_${quoteNumber || 'Unbekannt'}.pdf`,
-          content: pdfBase64,
-        };
-        console.log('PDF attachment created successfully');
-      } else {
-        console.log('PDF generation failed, proceeding without attachment');
+    const requestData = await req.json();
+    console.log('Received booking request from IP:', clientIP);
+    
+    // Validate and sanitize input data
+    const validation = validateBookingData(requestData);
+    if (!validation.isValid) {
+      console.error('Validation errors:', validation.errors);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input data', 
+          details: validation.errors 
+        }),
+        { 
+          status: 400, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
+    }
+
+    // Sanitize all input data
+    const sanitizedData = {
+      customerName: sanitizeInput(requestData.customerName, 100),
+      customerEmail: sanitizeInput(requestData.customerEmail, 100),
+      customerPhone: sanitizeInput(requestData.customerPhone, 20),
+      service: sanitizeInput(requestData.service, 200),
+      preferredDate: sanitizeInput(requestData.preferredDate, 50),
+      preferredTime: sanitizeInput(requestData.preferredTime || '', 50),
+      message: sanitizeInput(requestData.message || '', 2000),
+      totalAmount: requestData.totalAmount || 0,
+      items: Array.isArray(requestData.items) ? requestData.items.slice(0, 20) : [] // Limit items
+    };
+
+    console.log('Processing sanitized booking data for:', sanitizedData.customerEmail);
+
+    // Get Resend API key from environment
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendApiKey) {
+      console.error('RESEND_API_KEY not found in environment variables');
+      return new Response(
+        JSON.stringify({ error: 'Email service configuration error' }),
+        { 
+          status: 500, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
+    }
+
+    const resend = {
+      emails: {
+        send: async (emailData: any) => {
+          const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${resendApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(emailData),
+          });
+          
+          const data = await response.json();
+          return { 
+            data: response.ok ? data : null, 
+            error: response.ok ? null : data 
+          };
+        }
       }
-    }
+    };
+
+    // Generate unique booking reference
+    const bookingRef = `DW-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+    // Format items for email display
+    const itemsHtml = sanitizedData.items.map((item: any) => `
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #374151;">${sanitizeInput(item.service || '', 200)}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 14px;">${sanitizeInput(item.description || '', 500)}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; color: #374151; text-align: right; font-weight: 600;">${(Number(item.price) || 0).toLocaleString('de-DE')} €</td>
+      </tr>
+    `).join('');
 
     // Send customer confirmation email
     console.log('Sending customer confirmation email...');
     const customerEmailResponse = await resend.emails.send({
-      from: "DigitalWert <onboarding@resend.dev>",
-      to: [email],
-      subject: "Bestätigung Ihres Beratungstermins - DigitalWert",
+      from: 'Digitalwert <noreply@digitalwert.de>',
+      to: [sanitizedData.customerEmail],
+      subject: `Terminbestätigung - ${sanitizedData.service}`,
       html: `
-        <div style="font-family: 'Titillium Web', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&display=swap');
-          </style>
-          
-          <h1 style="color: #1a365d; text-align: center; font-family: 'Titillium Web', Arial, sans-serif; font-weight: 700;">Terminbestätigung</h1>
-          
-          <p style="font-family: 'Titillium Web', Arial, sans-serif;">Liebe(r) ${name},</p>
-          
-          <p style="font-family: 'Titillium Web', Arial, sans-serif;">vielen Dank für Ihre Terminanfrage! Wir haben Ihren gewünschten Beratungstermin erhalten und werden uns schnellstmöglich bei Ihnen melden, um den Termin zu bestätigen.</p>
-          
-          <div style="background-color: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0; font-family: 'Titillium Web', Arial, sans-serif;">
-            <h3 style="color: #2d3748; margin-top: 0; font-family: 'Titillium Web', Arial, sans-serif; font-weight: 600;">Ihre Termindetails:</h3>
-            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Datum:</strong> ${formattedDate}</p>
-            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Uhrzeit:</strong> ${preferredTime} Uhr</p>
-            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Dauer:</strong> ca. 60 Minuten</p>
-            ${quoteNumber && quoteTitle ? `
-              <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Bezugnahme auf Angebot:</strong> ${quoteTitle} (${quoteNumber})</p>
-            ` : ''}
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Terminbestätigung</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">Digitalwert</h1>
+              <p style="color: #e0e7ff; margin: 8px 0 0 0; font-size: 16px;">Terminbestätigung</p>
+            </div>
+            
+            <!-- Content -->
+            <div style="padding: 32px;">
+              <h2 style="color: #111827; margin: 0 0 24px 0; font-size: 24px; font-weight: 600;">Hallo ${sanitizedData.customerName},</h2>
+              
+              <p style="color: #374151; line-height: 1.6; margin: 0 0 24px 0; font-size: 16px;">
+                vielen Dank für Ihre Terminanfrage! Wir haben Ihre Anfrage erhalten und werden uns in Kürze bei Ihnen melden, um den Termin zu bestätigen.
+              </p>
+              
+              <!-- Booking Details -->
+              <div style="background-color: #f9fafb; border-radius: 8px; padding: 24px; margin: 24px 0;">
+                <h3 style="color: #111827; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Ihre Termindetails:</h3>
+                <div style="space-y: 8px;">
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>Buchungsreferenz:</strong> ${bookingRef}</p>
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>Service:</strong> ${sanitizedData.service}</p>
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>Gewünschter Termin:</strong> ${sanitizedData.preferredDate}${sanitizedData.preferredTime ? ` um ${sanitizedData.preferredTime}` : ''}</p>
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>Kontakt:</strong> ${sanitizedData.customerPhone}</p>
+                  ${sanitizedData.message ? `<p style="margin: 0 0 8px 0; color: #374151;"><strong>Ihre Nachricht:</strong> ${sanitizedData.message}</p>` : ''}
+                </div>
+              </div>
+              
+              ${sanitizedData.items.length > 0 ? `
+              <!-- Quote Items -->
+              <div style="margin: 24px 0;">
+                <h3 style="color: #111827; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Angefragte Leistungen:</h3>
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                  <thead>
+                    <tr style="background-color: #f9fafb;">
+                      <th style="padding: 12px; text-align: left; color: #374151; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Leistung</th>
+                      <th style="padding: 12px; text-align: left; color: #374151; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Beschreibung</th>
+                      <th style="padding: 12px; text-align: right; color: #374151; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Preis</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${itemsHtml}
+                  </tbody>
+                  ${sanitizedData.totalAmount > 0 ? `
+                  <tfoot>
+                    <tr style="background-color: #f9fafb;">
+                      <td colspan="2" style="padding: 12px; font-weight: 600; color: #374151;">Gesamtsumme:</td>
+                      <td style="padding: 12px; text-align: right; font-weight: 700; color: #111827; font-size: 18px;">${Number(sanitizedData.totalAmount).toLocaleString('de-DE')} €</td>
+                    </tr>
+                  </tfoot>
+                  ` : ''}
+                </table>
+              </div>
+              ` : ''}
+              
+              <p style="color: #374151; line-height: 1.6; margin: 24px 0; font-size: 16px;">
+                Wir werden Ihren Terminwunsch prüfen und Ihnen innerhalb von 24 Stunden eine Bestätigung zusenden. Falls Sie Fragen haben, können Sie uns jederzeit kontaktieren.
+              </p>
+              
+              <!-- Contact Info -->
+              <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 24px 0;">
+                <h4 style="color: #1e40af; margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">Kontakt:</h4>
+                <p style="color: #1e40af; margin: 0; font-size: 14px;">
+                  E-Mail: info@digitalwert.de<br>
+                  Telefon: +49 (0) 123 456 789
+                </p>
+              </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="background-color: #f9fafb; padding: 24px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; margin: 0; font-size: 14px;">
+                Mit freundlichen Grüßen,<br>
+                Ihr Digitalwert Team
+              </p>
+            </div>
           </div>
-          
-          <p style="font-family: 'Titillium Web', Arial, sans-serif;">Wir werden Sie in Kürze kontaktieren, um den Termin zu bestätigen und weitere Details zu besprechen.</p>
-          
-          <p style="font-family: 'Titillium Web', Arial, sans-serif;">Bei Fragen oder Änderungen können Sie uns jederzeit kontaktieren.</p>
-          
-          <p style="font-family: 'Titillium Web', Arial, sans-serif;">Freundliche Grüße,<br>
-          Ihr DigitalWert Team</p>
-          
-          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e2e8f0;">
-          <p style="font-size: 12px; color: #718096; text-align: center; font-family: 'Titillium Web', Arial, sans-serif;">
-            DigitalWert - Ihr Partner für digitale Lösungen<br>
-            Diese E-Mail wurde automatisch generiert.
-          </p>
-        </div>
+        </body>
+        </html>
       `,
     });
 
@@ -224,47 +267,99 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Prepare internal notification email
     const internalEmailData: any = {
-      from: "DigitalWert <onboarding@resend.dev>",
-      to: ["97samisalih@gmail.com"],
-      subject: `Neue Terminbuchung - ${name}`,
+      from: 'Digitalwert Booking System <noreply@digitalwert.de>',
+      to: ['97samisalih@gmail.com'],
+      subject: `🔔 Neue Terminanfrage - ${sanitizedData.service}`,
       html: `
-        <div style="font-family: 'Titillium Web', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&display=swap');
-          </style>
-          
-          <h1 style="color: #1a365d; text-align: center; font-family: 'Titillium Web', Arial, sans-serif; font-weight: 700;">Neue Terminbuchung</h1>
-          
-          <div style="background-color: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0; font-family: 'Titillium Web', Arial, sans-serif;">
-            <h3 style="color: #2d3748; margin-top: 0; font-family: 'Titillium Web', Arial, sans-serif; font-weight: 600;">Kundendaten:</h3>
-            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Name:</strong> ${name}</p>
-            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>E-Mail:</strong> ${email}</p>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Neue Terminanfrage</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 40px 32px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700;">Digitalwert Admin</h1>
+              <p style="color: #fecaca; margin: 8px 0 0 0; font-size: 16px;">Neue Terminanfrage eingegangen</p>
+            </div>
+            
+            <!-- Content -->
+            <div style="padding: 32px;">
+              <div style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; margin: 0 0 24px 0;">
+                <h2 style="color: #dc2626; margin: 0; font-size: 20px; font-weight: 600;">⚡ Aktion erforderlich</h2>
+                <p style="color: #7f1d1d; margin: 8px 0 0 0;">Eine neue Terminanfrage ist eingegangen und wartet auf Ihre Bearbeitung.</p>
+              </div>
+              
+              <!-- Customer Details -->
+              <div style="background-color: #f9fafb; border-radius: 8px; padding: 24px; margin: 24px 0;">
+                <h3 style="color: #111827; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Kundeninformationen:</h3>
+                <div style="space-y: 8px;">
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>Buchungsreferenz:</strong> ${bookingRef}</p>
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>Name:</strong> ${sanitizedData.customerName}</p>
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>E-Mail:</strong> <a href="mailto:${sanitizedData.customerEmail}" style="color: #3b82f6;">${sanitizedData.customerEmail}</a></p>
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>Telefon:</strong> <a href="tel:${sanitizedData.customerPhone}" style="color: #3b82f6;">${sanitizedData.customerPhone}</a></p>
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>Service:</strong> ${sanitizedData.service}</p>
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>Gewünschter Termin:</strong> ${sanitizedData.preferredDate}${sanitizedData.preferredTime ? ` um ${sanitizedData.preferredTime}` : ''}</p>
+                  ${sanitizedData.message ? `<p style="margin: 0 0 8px 0; color: #374151;"><strong>Nachricht:</strong> ${sanitizedData.message}</p>` : ''}
+                  <p style="margin: 0 0 8px 0; color: #374151;"><strong>Angefragt am:</strong> ${new Date().toLocaleString('de-DE')}</p>
+                </div>
+              </div>
+              
+              ${sanitizedData.items.length > 0 ? `
+              <!-- Quote Items -->
+              <div style="margin: 24px 0;">
+                <h3 style="color: #111827; margin: 0 0 16px 0; font-size: 18px; font-weight: 600;">Angefragte Leistungen:</h3>
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                  <thead>
+                    <tr style="background-color: #f9fafb;">
+                      <th style="padding: 12px; text-align: left; color: #374151; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Leistung</th>
+                      <th style="padding: 12px; text-align: left; color: #374151; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Beschreibung</th>
+                      <th style="padding: 12px; text-align: right; color: #374151; font-weight: 600; border-bottom: 1px solid #e5e7eb;">Preis</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${itemsHtml}
+                  </tbody>
+                  ${sanitizedData.totalAmount > 0 ? `
+                  <tfoot>
+                    <tr style="background-color: #f9fafb;">
+                      <td colspan="2" style="padding: 12px; font-weight: 600; color: #374151;">Gesamtsumme:</td>
+                      <td style="padding: 12px; text-align: right; font-weight: 700; color: #111827; font-size: 18px;">${Number(sanitizedData.totalAmount).toLocaleString('de-DE')} €</td>
+                    </tr>
+                  </tfoot>
+                  ` : ''}
+                </table>
+              </div>
+              ` : ''}
+              
+              <!-- Action Buttons -->
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="mailto:${sanitizedData.customerEmail}?subject=Terminbestätigung%20-%20${encodeURIComponent(sanitizedData.service)}" 
+                   style="display: inline-block; background-color: #10b981; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 0 8px;">
+                  ✅ Termin bestätigen
+                </a>
+                <a href="mailto:${sanitizedData.customerEmail}?subject=Rückfrage%20zu%20Ihrem%20Terminwunsch" 
+                   style="display: inline-block; background-color: #f59e0b; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 0 8px;">
+                  ❓ Rückfrage stellen
+                </a>
+              </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="background-color: #f9fafb; padding: 24px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; margin: 0; font-size: 14px;">
+                Digitalwert Admin Panel<br>
+                Automatisch generiert am ${new Date().toLocaleString('de-DE')}
+              </p>
+            </div>
           </div>
-          
-          <div style="background-color: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0; font-family: 'Titillium Web', Arial, sans-serif;">
-            <h3 style="color: #2d3748; margin-top: 0; font-family: 'Titillium Web', Arial, sans-serif; font-weight: 600;">Termindetails:</h3>
-            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Datum:</strong> ${formattedDate}</p>
-            <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Uhrzeit:</strong> ${preferredTime} Uhr</p>
-            ${quoteNumber && quoteTitle ? `
-              <p style="font-family: 'Titillium Web', Arial, sans-serif;"><strong>Zugehöriges Angebot:</strong> ${quoteTitle} (${quoteNumber})</p>
-            ` : ''}
-          </div>
-          
-          <p style="font-family: 'Titillium Web', Arial, sans-serif;">Bitte bestätigen Sie den Termin zeitnah beim Kunden.</p>
-          
-          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e2e8f0;">
-          <p style="font-size: 12px; color: #718096; text-align: center; font-family: 'Titillium Web', Arial, sans-serif;">
-            DigitalWert - Automatische Benachrichtigung
-          </p>
-        </div>
+        </body>
+        </html>
       `,
     };
-
-    // Add PDF attachment if available
-    if (pdfAttachment) {
-      internalEmailData.attachments = [pdfAttachment];
-      console.log('Added PDF attachment to internal email');
-    }
 
     // Send internal notification email
     console.log('Sending internal notification email to 97samisalih@gmail.com...');
@@ -278,28 +373,31 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify({ 
       success: true, 
+      bookingReference: bookingRef,
       customerEmailId: customerEmailResponse.data?.id,
       internalEmailId: internalEmailResponse.data?.id,
-      pdfAttached: !!pdfAttachment,
       customerEmailError: customerEmailResponse.error,
       internalEmailError: internalEmailResponse.error
     }), {
       status: 200,
       headers: {
-        "Content-Type": "application/json",
         ...corsHeaders,
+        'Content-Type': 'application/json',
       },
     });
-  } catch (error: any) {
-    console.error("Error in send-booking-confirmation function:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
-    );
-  }
-};
 
-serve(handler);
+  } catch (error) {
+    console.error('Error in booking confirmation function:', error);
+    
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      message: 'An unexpected error occurred while processing your booking request'
+    }), {
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+})
