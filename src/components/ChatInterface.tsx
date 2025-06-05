@@ -12,6 +12,7 @@ interface Message {
   text: string;
   isBot: boolean;
   timestamp: Date;
+  isStreaming?: boolean;
 }
 
 interface ChatInterfaceProps {
@@ -50,7 +51,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: "Hallo! Ich bin Ihr KI-Berater von Digitalwert. Gerne berate ich Sie zu Webauftritten, Rebrandings, UI Design und der technischen Realisierung von Shop-Websites. Wie kann ich Ihnen heute helfen?",
+      text: "Hallo! Ich bin Ihr KI-Berater von Digitalwert. Gerne berate ich Sie zu Webauftritten, Rebrandings, UI Design und der technischen Realisierung von Shop-Websites. Beschreiben Sie mir Ihr Projekt und ich helfe Ihnen bei der Konzeption!",
       isBot: true,
       timestamp: new Date()
     }
@@ -86,10 +87,10 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
     return true;
   };
 
-  const getAIResponse = async (userMessage: string) => {
+  const getStreamingAIResponse = async (userMessage: string) => {
     try {
       // Bereite die Nachrichtenhistorie für die KI vor
-      const chatHistory = messages.map(msg => ({
+      const chatHistory = messages.filter(msg => !msg.isStreaming).map(msg => ({
         role: msg.isBot ? 'assistant' : 'user',
         content: msg.text
       }));
@@ -100,7 +101,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
         content: userMessage
       });
 
-      console.log('Sending chat request to AI...');
+      console.log('Sending streaming chat request to AI...');
       
       const { data, error } = await supabase.functions.invoke('chat-with-ai', {
         body: { messages: chatHistory }
@@ -111,22 +112,93 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
         throw error;
       }
 
-      console.log('AI response received:', data);
+      // Handle streaming response
+      const response = await fetch(`https://rtxvbdvhzjsktmhdfdfv.supabase.co/functions/v1/chat-with-ai`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+        },
+        body: JSON.stringify({ messages: chatHistory })
+      });
 
-      // Prüfe auf Quote-Empfehlung
-      if (data.quoteRecommendation) {
-        console.log('Adding quote recommendation:', data.quoteRecommendation);
-        setTimeout(() => {
-          onAddQuoteItem({
-            ...data.quoteRecommendation,
-            id: Date.now()
-          });
-        }, 1000);
+      if (!response.ok || !response.body) {
+        throw new Error('Streaming response failed');
       }
 
-      return data.response || 'Entschuldigung, ich konnte keine passende Antwort generieren.';
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      // Create initial streaming message
+      const streamingMessageId = Date.now() + 1;
+      const initialMessage: Message = {
+        id: streamingMessageId,
+        text: '',
+        isBot: true,
+        timestamp: new Date(),
+        isStreaming: true
+      };
+
+      setMessages(prev => [...prev, initialMessage]);
+
+      let buffer = '';
+      let accumulatedText = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') {
+                // Finalize the message
+                setMessages(prev => prev.map(msg => 
+                  msg.id === streamingMessageId 
+                    ? { ...msg, isStreaming: false }
+                    : msg
+                ));
+                return;
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+                
+                if (parsed.type === 'content') {
+                  accumulatedText += parsed.data;
+                  // Update the streaming message
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === streamingMessageId 
+                      ? { ...msg, text: accumulatedText }
+                      : msg
+                  ));
+                } else if (parsed.type === 'quote_recommendation') {
+                  console.log('Adding quote recommendation:', parsed.data);
+                  setTimeout(() => {
+                    onAddQuoteItem({
+                      ...parsed.data,
+                      id: Date.now()
+                    });
+                  }, 1000);
+                }
+              } catch (e) {
+                // Skip malformed JSON
+              }
+            }
+          }
+        }
+      } catch (streamError) {
+        console.error('Stream reading error:', streamError);
+        throw streamError;
+      }
+
     } catch (error) {
-      console.error('Error getting AI response:', error);
+      console.error('Error getting streaming AI response:', error);
       return 'Entschuldigung, es gab einen technischen Fehler. Bitte versuchen Sie es erneut.';
     }
   };
@@ -159,16 +231,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
     setIsTyping(true);
 
     try {
-      const aiResponse = await getAIResponse(sanitizedInput);
-      
-      const botResponse: Message = {
-        id: Date.now() + 1,
-        text: aiResponse,
-        isBot: true,
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, botResponse]);
+      await getStreamingAIResponse(sanitizedInput);
     } catch (error) {
       console.error('Error in handleSend:', error);
       const errorResponse: Message = {
@@ -230,6 +293,9 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                     <div className="flex-1 min-w-0">
                       <div className="whitespace-pre-line break-words leading-relaxed">
                         {message.isBot ? renderMarkdown(message.text) : message.text}
+                        {message.isStreaming && (
+                          <span className="inline-block w-2 h-5 bg-digitalwert-primary animate-pulse ml-1" />
+                        )}
                       </div>
                       <p className="text-xs opacity-70 mt-2">
                         {message.timestamp.toLocaleTimeString()}

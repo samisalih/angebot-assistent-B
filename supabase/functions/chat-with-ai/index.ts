@@ -29,7 +29,7 @@ serve(async (req) => {
 
     console.log('Chat request received with', messages.length, 'messages');
 
-    // System prompt für den Digitalwert KI-Berater
+    // System prompt - fokussiert auf Beratung ohne Preise
     const systemPrompt = `Du bist ein professioneller KI-Berater von Digitalwert, einem Unternehmen für digitale Lösungen. Du hilfst Kunden bei:
 
 - Webauftritten und Corporate Websites
@@ -42,17 +42,10 @@ WICHTIGE REGELN:
 1. Antworte IMMER auf Deutsch
 2. Sei professionell, freundlich und beratend
 3. Stelle konkrete Nachfragen zu Anforderungen
-4. Wenn ein Kunde Interesse an einem Service zeigt, gib eine JSON-Empfehlung am Ende deiner Antwort in diesem Format:
-   [QUOTE_RECOMMENDATION]{"service": "Service Name", "description": "Beschreibung", "price": 2500}[/QUOTE_RECOMMENDATION]
-
-PREISE (als Richtwerte):
-- Einfache Website: 1500-3000€
-- Professioneller Webauftritt: 2500-5000€
-- E-Commerce Shop: 4000-8000€
-- Corporate Rebranding: 3000-6000€
-- UI/UX Design: 1500-3500€
-- Logo Design: 800-2000€
-- Content Management System: 2000-4000€
+4. ERWÄHNE NIEMALS konkrete Preise - das übernimmt das Angebotssystem
+5. Fokussiere dich auf technische Beratung und Lösungsfindung
+6. Wenn ein Kunde Interesse an einem Service zeigt, gib eine JSON-Empfehlung am Ende deiner Antwort in diesem Format:
+   [QUOTE_RECOMMENDATION]{"service": "Service Name", "description": "Detaillierte Beschreibung der Leistung", "estimatedHours": 40, "complexity": "medium"}[/QUOTE_RECOMMENDATION]
 
 Analysiere die Kundenanfrage sorgfältig und empfehle passende Services nur wenn der Kunde konkretes Interesse zeigt.`;
 
@@ -72,7 +65,7 @@ Analysiere die Kundenanfrage sorgfältig und empfehle passende Services nur wenn
         messages: fullMessages,
         temperature: 0.7,
         max_tokens: 1000,
-        stream: false,
+        stream: true, // Enable streaming
       }),
     });
 
@@ -80,31 +73,86 @@ Analysiere die Kundenanfrage sorgfältig und empfehle passende Services nur wenn
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    // Create a ReadableStream for streaming response
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullResponse = '';
 
-    console.log('AI response generated successfully');
+        try {
+          while (true) {
+            const { done, value } = await reader!.read();
+            if (done) break;
 
-    // Prüfe auf Quote-Empfehlungen
-    let quoteRecommendation = null;
-    const quoteMatch = aiResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/);
-    if (quoteMatch) {
-      try {
-        quoteRecommendation = JSON.parse(quoteMatch[1]);
-        console.log('Quote recommendation extracted:', quoteRecommendation);
-      } catch (e) {
-        console.error('Failed to parse quote recommendation:', e);
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') {
+                  // Process final response for quote recommendations
+                  let quoteRecommendation = null;
+                  const quoteMatch = fullResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/);
+                  if (quoteMatch) {
+                    try {
+                      quoteRecommendation = JSON.parse(quoteMatch[1]);
+                      console.log('Quote recommendation extracted:', quoteRecommendation);
+                    } catch (e) {
+                      console.error('Failed to parse quote recommendation:', e);
+                    }
+                  }
+
+                  // Send final message with quote recommendation
+                  if (quoteRecommendation) {
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                      type: 'quote_recommendation',
+                      data: quoteRecommendation
+                    })}\n\n`));
+                  }
+                  
+                  controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+                  controller.close();
+                  return;
+                }
+
+                try {
+                  const parsed = JSON.parse(data);
+                  const content = parsed.choices?.[0]?.delta?.content;
+                  if (content) {
+                    fullResponse += content;
+                    // Remove quote recommendation tags from streamed content
+                    const cleanContent = content.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
+                    if (cleanContent) {
+                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                        type: 'content',
+                        data: cleanContent
+                      })}\n\n`));
+                    }
+                  }
+                } catch (e) {
+                  // Skip malformed JSON
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Streaming error:', error);
+          controller.error(error);
+        }
       }
-    }
+    });
 
-    // Entferne die Quote-Tags aus der Antwort
-    const cleanResponse = aiResponse.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '').trim();
-
-    return new Response(JSON.stringify({ 
-      response: cleanResponse,
-      quoteRecommendation: quoteRecommendation
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
     });
   } catch (error) {
     console.error('Error in chat-with-ai function:', error);
