@@ -160,10 +160,13 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
             if (line.startsWith('data: ')) {
               const data = line.slice(6);
               if (data === '[DONE]') {
+                // Remove any remaining QUOTE_RECOMMENDATION tags from final text
+                const cleanFinalText = accumulatedText.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '').trim();
+                
                 // Finalize the message
                 setMessages(prev => prev.map(msg => 
                   msg.id === streamingMessageId 
-                    ? { ...msg, isStreaming: false }
+                    ? { ...msg, text: cleanFinalText, isStreaming: false }
                     : msg
                 ));
                 return;
@@ -173,13 +176,47 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 const parsed = JSON.parse(data);
                 
                 if (parsed.type === 'content') {
-                  accumulatedText += parsed.data;
-                  // Update the streaming message
-                  setMessages(prev => prev.map(msg => 
-                    msg.id === streamingMessageId 
-                      ? { ...msg, text: accumulatedText }
-                      : msg
-                  ));
+                  // Filter out QUOTE_RECOMMENDATION tags from streamed content
+                  const cleanContent = parsed.data.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
+                  
+                  if (cleanContent) {
+                    accumulatedText += cleanContent;
+                    // Update the streaming message
+                    setMessages(prev => prev.map(msg => 
+                      msg.id === streamingMessageId 
+                        ? { ...msg, text: accumulatedText }
+                        : msg
+                    ));
+                  }
+                  
+                  // Always accumulate the full content (including tags) for quote processing
+                  const fullContent = parsed.data;
+                  
+                  // Check for complete quote recommendations in the accumulated content
+                  const quoteMatch = fullContent.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/);
+                  if (quoteMatch) {
+                    try {
+                      const quoteRecommendation = JSON.parse(quoteMatch[1]);
+                      console.log('Quote recommendation found in content:', quoteRecommendation);
+                      
+                      setTimeout(() => {
+                        // Transform AI recommendation to match QuoteItem interface
+                        const quoteItem = {
+                          service: quoteRecommendation.service,
+                          description: quoteRecommendation.description,
+                          estimatedHours: quoteRecommendation.estimatedHours,
+                          complexity: quoteRecommendation.complexity,
+                          price: quoteRecommendation.estimatedHours && quoteRecommendation.complexity 
+                            ? calculatePrice(quoteRecommendation.estimatedHours, quoteRecommendation.complexity)
+                            : 0,
+                          id: Date.now()
+                        };
+                        onAddQuoteItem(quoteItem);
+                      }, 1000);
+                    } catch (e) {
+                      console.error('Failed to parse quote recommendation from content:', e);
+                    }
+                  }
                 } else if (parsed.type === 'quote_recommendation') {
                   console.log('Adding quote recommendation:', parsed.data);
                   setTimeout(() => {
