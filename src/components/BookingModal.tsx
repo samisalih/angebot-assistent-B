@@ -303,23 +303,32 @@ export function BookingModal({ isOpen, onClose, currentQuoteItems = [] }: Bookin
                       <SelectValue placeholder="Angebot auswählen" />
                     </div>
                   </SelectTrigger>
-                  <SelectContent className="bg-white z-50">
+                  <SelectContent className="bg-white z-[100] max-h-[300px] overflow-y-auto">
                     {allQuotes.length === 0 ? (
                       <SelectItem value="no-quotes" disabled>
                         Keine Angebote verfügbar
                       </SelectItem>
                     ) : (
                       allQuotes.map((quote) => (
-                        <SelectItem key={quote.id} value={quote.id!}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {quote.id === 'current' ? '📝 ' : ''}
-                              {quote.title}
-                            </span>
-                            <span className="text-sm text-slate-500">
-                              #{quote.quote_number} - {Number(quote.total_amount).toLocaleString('de-DE')} €
-                              {quote.id === 'current' ? ' (wird beim Buchen gespeichert)' : ''}
-                            </span>
+                        <SelectItem key={quote.id} value={quote.id!} className="py-3">
+                          <div className="flex flex-col gap-1 min-w-0 w-full">
+                            <div className="flex items-center gap-2">
+                              {quote.id === 'current' && <span className="text-lg">📝</span>}
+                              <span className="font-medium text-sm truncate">
+                                {quote.title}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-500 space-y-1">
+                              <div>#{quote.quote_number}</div>
+                              <div className="font-medium">
+                                {Number(quote.total_amount).toLocaleString('de-DE')} €
+                              </div>
+                              {quote.id === 'current' && (
+                                <div className="text-blue-600 italic">
+                                  (wird beim Buchen gespeichert)
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </SelectItem>
                       ))
