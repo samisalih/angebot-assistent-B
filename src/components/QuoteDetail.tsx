@@ -9,6 +9,7 @@ import { Download, Calendar, X, FileText } from 'lucide-react';
 import { Quote } from '@/hooks/useQuotes';
 import { useToast } from '@/hooks/use-toast';
 import { BookingModal } from '@/components/BookingModal';
+import { generateQuotePDF } from '@/utils/pdfGenerator';
 
 interface QuoteDetailProps {
   quote: Quote | null;
@@ -43,17 +44,19 @@ export function QuoteDetail({ quote, isOpen, onClose }: QuoteDetailProps) {
   };
 
   const handleDownloadPDF = () => {
-    toast({
-      title: "PDF wird erstellt",
-      description: `Angebot ${quote.quote_number} wird als PDF heruntergeladen...`,
-    });
-    
-    setTimeout(() => {
+    try {
+      generateQuotePDF(quote);
       toast({
-        title: "PDF bereit",
+        title: "PDF erstellt",
         description: `Angebot ${quote.quote_number} wurde erfolgreich heruntergeladen.`,
       });
-    }, 2000);
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "PDF konnte nicht erstellt werden.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleBooking = () => {

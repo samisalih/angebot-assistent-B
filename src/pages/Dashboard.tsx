@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { QuoteDetail } from '@/components/QuoteDetail';
 import { BookingModal } from '@/components/BookingModal';
+import { generateQuotePDF } from '@/utils/pdfGenerator';
 
 const Dashboard = () => {
   const { user, profile, signOut } = useAuth();
@@ -39,19 +41,20 @@ const Dashboard = () => {
     }
   };
 
-  const handleDownloadPDF = (quote: any) => {
-    toast({
-      title: "PDF wird erstellt",
-      description: `Angebot ${quote.quote_number} wird als PDF heruntergeladen...`,
-    });
-    
-    // Simulate PDF generation
-    setTimeout(() => {
+  const handleDownloadPDF = (quote: Quote) => {
+    try {
+      generateQuotePDF(quote);
       toast({
-        title: "PDF bereit",
+        title: "PDF erstellt",
         description: `Angebot ${quote.quote_number} wurde erfolgreich heruntergeladen.`,
       });
-    }, 2000);
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "PDF konnte nicht erstellt werden.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleViewQuote = (quote: Quote) => {

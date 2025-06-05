@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Download, Calendar, Save, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { generateQuotePDF } from '@/utils/pdfGenerator';
 
 interface QuoteItem {
   id: number;
@@ -28,18 +29,42 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
   const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
 
   const handleDownloadPDF = () => {
-    toast({
-      title: "PDF wird erstellt",
-      description: "Ihr Angebot wird als PDF heruntergeladen...",
-    });
-    
-    // Simulate PDF generation
-    setTimeout(() => {
+    if (items.length === 0) {
       toast({
-        title: "PDF bereit",
+        title: "Keine Positionen",
+        description: "Fügen Sie erst Positionen hinzu, bevor Sie ein PDF erstellen.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Create a quote object for PDF generation
+      const quoteForPDF = {
+        quote_number: quoteNumber,
+        title: 'Kostenvoranschlag',
+        status: 'draft' as const,
+        total_amount: totalPrice,
+        items: items.map(item => ({
+          service: item.service,
+          description: item.description,
+          price: item.price
+        })),
+        created_at: new Date().toISOString()
+      };
+
+      generateQuotePDF(quoteForPDF);
+      toast({
+        title: "PDF erstellt",
         description: `Angebot ${quoteNumber} wurde erfolgreich heruntergeladen.`,
       });
-    }, 2000);
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "PDF konnte nicht erstellt werden.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSaveQuote = () => {
