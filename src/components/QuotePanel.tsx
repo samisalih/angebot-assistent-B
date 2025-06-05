@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -110,15 +111,16 @@ export function QuotePanel({
         {items.length > 0 && <div className="flex-shrink-0 pt-4 border-t border-digitalwert-background-lighter">
             <div className="space-y-4">
               <div className="flex justify-between items-center text-lg font-bold">
-                <span className="text-white">Gesamtsumme (netto):</span>
+                <span className="text-white">Gesamtsumme (brutto):</span>
                 <span className="text-digitalwert-primary">
-                  {totalPrice > 0 ? `${totalPrice.toLocaleString('de-DE')} €` : 'Auf Anfrage'}
+                  {totalPrice > 0 ? `${Math.round(totalPrice * 1.19).toLocaleString('de-DE')} €` : 'Auf Anfrage'}
                 </span>
               </div>
               {totalPrice > 0 && <div className="text-sm text-slate-300">
+                  <p>Nettobetrag: {totalPrice.toLocaleString('de-DE')} €</p>
                   <p>+ 19% MwSt.: {Math.round(totalPrice * 0.19).toLocaleString('de-DE')} €</p>
                   <p className="font-semibold text-white">
-                    Gesamtbetrag: {Math.round(totalPrice * 1.19).toLocaleString('de-DE')} €
+                    Gesamtbetrag: {totalPrice.toLocaleString('de-DE')} € (netto)
                   </p>
                 </div>}
 
