@@ -12,7 +12,7 @@ interface QuoteData {
   id: string;
   quote_number: string;
   title: string;
-  status: string;
+  status: 'draft' | 'sent' | 'accepted' | 'rejected';
   total_amount: number;
   created_at: string;
   items: Array<{
