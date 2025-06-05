@@ -17,11 +17,10 @@ interface ChatInterfaceProps {
   onAddQuoteItem: (item: any) => void;
 }
 
-// Input sanitization function
+// Improved input sanitization function that preserves spaces
 const sanitizeInput = (input: string): string => {
   return input
-    .trim()
-    .replace(/[<>\"'&]/g, '')
+    .replace(/[<>\"'&]/g, '') // Remove dangerous HTML characters but keep spaces
     .substring(0, 2000);
 };
 
@@ -213,7 +212,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
   };
 
   const handleSend = async () => {
-    const sanitizedInput = sanitizeInput(input);
+    const sanitizedInput = sanitizeInput(input.trim()); // Only trim but don't remove internal spaces
     
     if (!sanitizedInput.trim()) return;
     
@@ -263,8 +262,8 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const sanitizedValue = sanitizeInput(e.target.value);
-    setInput(sanitizedValue);
+    // Don't sanitize during typing, only when sending
+    setInput(e.target.value.substring(0, 2000));
   };
 
   return (
