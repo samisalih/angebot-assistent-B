@@ -2,15 +2,20 @@
 import jsPDF from 'jspdf';
 import { Quote } from '@/hooks/useQuotes';
 
+// Helper function to draw rounded rectangles
+const drawRoundedRect = (doc: jsPDF, x: number, y: number, width: number, height: number, radius: number, style: string = 'S') => {
+  doc.roundedRect(x, y, width, height, radius, radius, style);
+};
+
 export const generateQuotePDF = (quote: Quote) => {
   const doc = new jsPDF();
   
   // Add Titillium Web font (we'll use a similar font that's available in jsPDF)
   doc.setFont('helvetica');
   
-  // Header with gradient-like background effect using dark blue
+  // Header with gradient-like background effect using dark blue with rounded corners
   doc.setFillColor(15, 25, 35); // digitalwert-background dark blue
-  doc.rect(0, 0, 210, 35, 'F');
+  drawRoundedRect(doc, 0, 0, 210, 35, 3, 'F');
   
   // Company name in header
   doc.setFontSize(24);
@@ -23,19 +28,19 @@ export const generateQuotePDF = (quote: Quote) => {
   doc.setFont('helvetica', 'normal');
   doc.text('Digitale Lösungen für Ihr Unternehmen', 20, 30);
   
-  // Quote title section
+  // Quote title section with rounded corners
   doc.setFillColor(240, 240, 240);
-  doc.rect(0, 40, 210, 25, 'F');
+  drawRoundedRect(doc, 0, 40, 210, 25, 3, 'F');
   
   doc.setFontSize(18);
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
   doc.text('Kostenvoranschlag', 20, 55);
   
-  // Quote details in modern card style
+  // Quote details in modern card style with rounded corners
   doc.setFillColor(250, 250, 250);
   doc.setDrawColor(220, 220, 220);
-  doc.rect(15, 75, 180, 35, 'FD');
+  drawRoundedRect(doc, 15, 75, 180, 35, 5, 'FD');
   
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
@@ -83,9 +88,9 @@ export const generateQuotePDF = (quote: Quote) => {
   
   yPosition += 15;
   
-  // Table header with background using dark blue
+  // Table header with background using dark blue and rounded corners
   doc.setFillColor(15, 25, 35); // Changed to dark blue
-  doc.rect(15, yPosition - 8, 180, 12, 'F');
+  drawRoundedRect(doc, 15, yPosition - 8, 180, 12, 3, 'F');
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
@@ -96,15 +101,15 @@ export const generateQuotePDF = (quote: Quote) => {
   
   yPosition += 8;
   
-  // Table content with alternating row colors
+  // Table content with alternating row colors and rounded corners
   doc.setFont('helvetica', 'normal');
   let isEvenRow = false;
   
   quote.items?.forEach((item, index) => {
-    // Alternating row background
+    // Alternating row background with rounded corners
     if (isEvenRow) {
       doc.setFillColor(248, 248, 248);
-      doc.rect(15, yPosition - 5, 180, 10, 'F');
+      drawRoundedRect(doc, 15, yPosition - 5, 180, 10, 2, 'F');
     }
     
     doc.setTextColor(0, 0, 0);
@@ -131,13 +136,13 @@ export const generateQuotePDF = (quote: Quote) => {
     isEvenRow = !isEvenRow;
   });
   
-  // Totals section with modern styling
+  // Totals section with modern styling and rounded corners
   yPosition += 10;
   
-  // Total box background
+  // Total box background with rounded corners
   doc.setFillColor(250, 250, 250);
   doc.setDrawColor(200, 200, 200);
-  doc.rect(120, yPosition - 5, 75, 35, 'FD');
+  drawRoundedRect(doc, 120, yPosition - 5, 75, 35, 5, 'FD');
   
   const totalNet = Number(quote.total_amount);
   const vat = Math.round(totalNet * 0.19);
@@ -173,9 +178,9 @@ export const generateQuotePDF = (quote: Quote) => {
   // Footer section
   yPosition += 50;
   
-  // Footer background
+  // Footer background with rounded corners
   doc.setFillColor(245, 245, 245);
-  doc.rect(0, yPosition - 5, 210, 25, 'F');
+  drawRoundedRect(doc, 0, yPosition - 5, 210, 25, 3, 'F');
   
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
