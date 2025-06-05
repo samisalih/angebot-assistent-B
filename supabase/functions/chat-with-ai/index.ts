@@ -29,7 +29,11 @@ serve(async (req) => {
 
     console.log('Chat request received with', messages.length, 'messages');
 
-    // Kürzerer, prägnanterer System-Prompt
+    if (!openAIApiKey) {
+      console.error('OpenAI API key not found');
+      throw new Error('OpenAI API key not configured');
+    }
+
     const systemPrompt = `Du bist ein KI-Berater von Digitalwert für digitale Lösungen.
 
 WICHTIGE REGELN:
@@ -58,6 +62,8 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
       ...messages
     ];
 
+    console.log('Sending request to OpenAI with', fullMessages.length, 'messages');
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -68,15 +74,18 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
         model: 'gpt-4o-mini',
         messages: fullMessages,
         temperature: 0.7,
-        max_tokens: 800,
+        max_tokens: 1000,
         stream: true,
       }),
     });
 
     if (!response.ok) {
-      console.error('OpenAI API error:', response.status, await response.text());
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
+
+    console.log('OpenAI response received, starting stream');
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -93,8 +102,32 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
           while (true) {
             const { done, value } = await reader.read();
             if (done) {
-              console.log('Stream finished, full response length:', fullResponse.length);
-              break;
+              console.log('Stream completed. Full response length:', fullResponse.length);
+              
+              // Process quote recommendations at the end
+              const quoteMatches = fullResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/g);
+              if (quoteMatches) {
+                console.log('Processing', quoteMatches.length, 'quote recommendations');
+                
+                for (const match of quoteMatches) {
+                  try {
+                    const jsonStr = match.replace(/\[QUOTE_RECOMMENDATION\]/, '').replace(/\[\/QUOTE_RECOMMENDATION\]/, '');
+                    const quoteRecommendation = JSON.parse(jsonStr);
+                    console.log('Quote recommendation:', quoteRecommendation);
+                    
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                      type: 'quote_recommendation',
+                      data: quoteRecommendation
+                    })}\n\n`));
+                  } catch (e) {
+                    console.error('Failed to parse quote recommendation:', e);
+                  }
+                }
+              }
+              
+              controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+              controller.close();
+              return;
             }
 
             buffer += decoder.decode(value, { stream: true });
@@ -106,30 +139,7 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
                 const data = line.slice(6).trim();
                 
                 if (data === '[DONE]') {
-                  // Verarbeite Quote-Empfehlungen am Ende
-                  const quoteMatches = fullResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/g);
-                  if (quoteMatches) {
-                    console.log('Processing', quoteMatches.length, 'quote recommendations');
-                    
-                    for (const match of quoteMatches) {
-                      try {
-                        const jsonStr = match.replace(/\[QUOTE_RECOMMENDATION\]/, '').replace(/\[\/QUOTE_RECOMMENDATION\]/, '');
-                        const quoteRecommendation = JSON.parse(jsonStr);
-                        console.log('Quote recommendation:', quoteRecommendation);
-                        
-                        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                          type: 'quote_recommendation',
-                          data: quoteRecommendation
-                        })}\n\n`));
-                      } catch (e) {
-                        console.error('Failed to parse quote recommendation:', e);
-                      }
-                    }
-                  }
-                  
-                  controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-                  controller.close();
-                  return;
+                  continue;
                 }
 
                 if (data) {
@@ -140,13 +150,12 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
                     if (content) {
                       fullResponse += content;
                       
-                      // Entferne Quote-Tags für die Anzeige
+                      // Clean content for display
                       let cleanContent = content;
                       cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
                       cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
                       cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
                       
-                      // Sende nur sauberen Content
                       if (cleanContent) {
                         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                           type: 'content',
@@ -155,7 +164,7 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
                       }
                     }
                   } catch (e) {
-                    console.error('Failed to parse streaming data:', e, 'Data:', data);
+                    console.error('Failed to parse streaming data:', e, 'Raw data:', data);
                   }
                 }
               }
@@ -164,6 +173,8 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
         } catch (error) {
           console.error('Stream reading error:', error);
           controller.error(error);
+        } finally {
+          reader.releaseLock();
         }
       }
     });
@@ -179,7 +190,8 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
   } catch (error) {
     console.error('Error in chat-with-ai function:', error);
     return new Response(JSON.stringify({ 
-      error: 'Entschuldigung, es gab einen technischen Fehler. Bitte versuchen Sie es erneut.' 
+      error: 'Entschuldigung, es gab einen technischen Fehler. Bitte versuchen Sie es erneut.',
+      details: error.message
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
