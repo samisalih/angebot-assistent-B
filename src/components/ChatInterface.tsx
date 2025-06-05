@@ -127,7 +127,6 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      // Create initial streaming message
       const streamingMessageId = Date.now() + 1;
       const initialMessage: Message = {
         id: streamingMessageId,
@@ -141,6 +140,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
 
       let buffer = '';
       let accumulatedText = '';
+      let processedQuotes = new Set(); // Verhindert doppelte Quote-Empfehlungen
 
       try {
         while (true) {
@@ -155,7 +155,6 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
             if (line.startsWith('data: ')) {
               const data = line.slice(6);
               if (data === '[DONE]') {
-                // Finalize the message
                 setMessages(prev => prev.map(msg => 
                   msg.id === streamingMessageId 
                     ? { ...msg, text: accumulatedText.trim(), isStreaming: false }
@@ -168,38 +167,41 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 const parsed = JSON.parse(data);
                 
                 if (parsed.type === 'content') {
-                  // Akkumuliere Content, aber filtere weiterhin Quote-Tags heraus
                   let cleanContent = parsed.data;
                   
-                  // Zusätzliche client-seitige Filterung für Sicherheit
+                  // Zusätzliche client-seitige Filterung
                   cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
                   cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
                   cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
                   
                   accumulatedText += cleanContent;
                   
-                  // Update the streaming message immediately
                   setMessages(prev => prev.map(msg => 
                     msg.id === streamingMessageId 
                       ? { ...msg, text: accumulatedText }
                       : msg
                   ));
                 } else if (parsed.type === 'quote_recommendation') {
-                  console.log('Adding quote recommendation:', parsed.data);
-                  setTimeout(() => {
-                    const recommendation = parsed.data;
-                    const quoteItem = {
-                      service: recommendation.service,
-                      description: recommendation.description,
-                      estimatedHours: recommendation.estimatedHours,
-                      complexity: recommendation.complexity,
-                      price: recommendation.estimatedHours && recommendation.complexity 
-                        ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
-                        : 0,
-                      id: Date.now() + Math.random() // Einzigartige ID für mehrere Items
-                    };
-                    onAddQuoteItem(quoteItem);
-                  }, 1000);
+                  const quoteId = `${parsed.data.service}_${parsed.data.estimatedHours}`;
+                  if (!processedQuotes.has(quoteId)) {
+                    processedQuotes.add(quoteId);
+                    console.log('Adding unique quote recommendation:', parsed.data);
+                    
+                    setTimeout(() => {
+                      const recommendation = parsed.data;
+                      const quoteItem = {
+                        service: recommendation.service,
+                        description: recommendation.description,
+                        estimatedHours: recommendation.estimatedHours,
+                        complexity: recommendation.complexity,
+                        price: recommendation.estimatedHours && recommendation.complexity 
+                          ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
+                          : 0,
+                        id: Date.now() + Math.random()
+                      };
+                      onAddQuoteItem(quoteItem);
+                    }, 1000);
+                  }
                 }
               } catch (e) {
                 // Skip malformed JSON

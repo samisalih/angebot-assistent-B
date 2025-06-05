@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Download, Calendar, Save, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { generateQuotePDF } from '@/utils/pdfGenerator';
@@ -41,7 +42,6 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
     }
 
     try {
-      // Create a quote object for PDF generation
       const quoteForPDF = {
         quote_number: quoteNumber,
         title: 'Kostenvoranschlag',
@@ -75,12 +75,12 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
 
   return (
     <Card className="h-[600px] flex flex-col bg-digitalwert-background border-digitalwert-background-lighter">
-      <CardHeader>
+      <CardHeader className="flex-shrink-0">
         <CardTitle className="text-white">Kostenvoranschlag</CardTitle>
         <p className="text-sm text-slate-400">Angebot Nr.: {quoteNumber}</p>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col">
-        <div className="flex-1 overflow-y-auto">
+      <CardContent className="flex-1 flex flex-col min-h-0 p-4">
+        <ScrollArea className="flex-1 pr-4">
           {items.length === 0 ? (
             <div className="text-center text-slate-400 py-8">
               <p>Noch keine Positionen hinzugefügt.</p>
@@ -89,33 +89,31 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 pb-4">
               {items.map((item) => (
                 <div key={item.id} className="border border-digitalwert-background-lighter bg-digitalwert-background-light rounded-lg p-4">
                   <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-white">{item.service}</h4>
-                      <p className="text-sm text-slate-300 mt-1">{item.description}</p>
-                      {item.estimatedHours && (
-                        <p className="text-xs text-slate-400 mt-1">
-                          Geschätzte Stunden: {item.estimatedHours}
-                        </p>
-                      )}
-                      {item.complexity && (
-                        <p className="text-xs text-slate-400">
-                          Komplexität: {item.complexity}
-                        </p>
-                      )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-white truncate">{item.service}</h4>
+                      <p className="text-sm text-slate-300 mt-1 break-words">{item.description}</p>
+                      <div className="flex flex-wrap gap-4 mt-2 text-xs text-slate-400">
+                        {item.estimatedHours && (
+                          <span>Stunden: {item.estimatedHours}</span>
+                        )}
+                        {item.complexity && (
+                          <span>Komplexität: {item.complexity}</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right ml-4">
+                    <div className="text-right ml-4 flex-shrink-0">
                       <p className="font-bold text-lg text-digitalwert-primary">
-                        {item.price ? `${item.price.toLocaleString('de-DE')} €` : 'Preis auf Anfrage'}
+                        {item.price ? `${item.price.toLocaleString('de-DE')} €` : 'Auf Anfrage'}
                       </p>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => onRemoveItem(item.id)}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1"
+                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20 p-1 mt-1"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -125,16 +123,15 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
               ))}
             </div>
           )}
-        </div>
+        </ScrollArea>
 
         {items.length > 0 && (
-          <>
-            <Separator className="my-4 bg-digitalwert-background-lighter" />
+          <div className="flex-shrink-0 pt-4 border-t border-digitalwert-background-lighter">
             <div className="space-y-4">
               <div className="flex justify-between items-center text-lg font-bold">
                 <span className="text-white">Gesamtsumme (netto):</span>
                 <span className="text-digitalwert-primary">
-                  {totalPrice > 0 ? `${totalPrice.toLocaleString('de-DE')} €` : 'Preis auf Anfrage'}
+                  {totalPrice > 0 ? `${totalPrice.toLocaleString('de-DE')} €` : 'Auf Anfrage'}
                 </span>
               </div>
               {totalPrice > 0 && (
@@ -166,7 +163,7 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
                 <p>Alle Preise verstehen sich als Projektpauschale</p>
               </div>
             </div>
-          </>
+          </div>
         )}
       </CardContent>
     </Card>

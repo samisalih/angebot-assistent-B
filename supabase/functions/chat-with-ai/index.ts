@@ -29,47 +29,29 @@ serve(async (req) => {
 
     console.log('Chat request received with', messages.length, 'messages');
 
-    // Verbesserter System-Prompt mit detaillierteren Angebotserstellungen
-    const systemPrompt = `Du bist ein professioneller KI-Berater von Digitalwert, einem Unternehmen für digitale Lösungen. Du hilfst Kunden bei:
-
-- Webauftritten und Corporate Websites
-- E-Commerce und Online-Shop Systemen  
-- Rebranding und Corporate Design
-- UI/UX Design für digitale Produkte
-- Technischer Realisierung von Web-Projekten
+    // Kürzerer, prägnanterer System-Prompt
+    const systemPrompt = `Du bist ein KI-Berater von Digitalwert für digitale Lösungen.
 
 WICHTIGE REGELN:
 1. Antworte IMMER auf Deutsch
-2. Sei professionell, freundlich und beratend
-3. Stelle konkrete Nachfragen zu Anforderungen
-4. ERWÄHNE NIEMALS konkrete Preise - das übernimmt das Angebotssystem
-5. Fokussiere dich auf technische Beratung und Lösungsfindung
+2. Sei prägnant und direkt - maximal 3-4 Sätze pro Antwort
+3. Stelle konkrete, kurze Nachfragen
+4. ERWÄHNE NIEMALS Preise
+5. Fokus auf Lösungsfindung
 
-ANGEBOTSERSTELLUNG - NUR WENN ALLE KRITERIEN ERFÜLLT SIND:
-- Der Kunde hat bereits konkrete Anforderungen genannt
-- Es wurden mindestens 2-3 Nachrichten ausgetauscht
-- Der Kunde zeigt deutliches Interesse an einer Umsetzung
-- Alle wichtigen Details sind geklärt
+ANGEBOTSERSTELLUNG - nur wenn ALLE Kriterien erfüllt:
+- Konkrete Anforderungen genannt
+- 2-3 Nachrichten ausgetauscht
+- Deutliches Interesse
+- Details geklärt
 
-WICHTIG: Erstelle DETAILLIERTE Angebote mit MEHREREN POSITIONEN. Teile große Projekte in sinnvolle Einzelleistungen auf:
+Erstelle DETAILLIERTE Angebote mit MEHREREN Positionen:
 
-Beispiel für eine Website:
-- Konzeption und Wireframes
-- Design und Corporate Identity
-- Frontend-Entwicklung
-- Backend-Entwicklung
-- CMS-Integration
-- SEO-Optimierung
-- Testing und Launch
+[QUOTE_RECOMMENDATION]{"service": "Konzeption & Wireframes", "description": "Erstellung von Wireframes und Konzept", "estimatedHours": 16, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
+[QUOTE_RECOMMENDATION]{"service": "Design & Branding", "description": "Visuelles Design und Corporate Identity", "estimatedHours": 24, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
+[QUOTE_RECOMMENDATION]{"service": "Frontend-Entwicklung", "description": "Responsive Umsetzung", "estimatedHours": 40, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
 
-Wenn ALLE Kriterien erfüllt sind, gib MEHRERE JSON-Empfehlungen am Ende deiner Antwort:
-[QUOTE_RECOMMENDATION]{"service": "Konzeption & Wireframes", "description": "Erstellung von Wireframes und technischem Konzept", "estimatedHours": 16, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
-[QUOTE_RECOMMENDATION]{"service": "Design & Corporate Identity", "description": "Visuelles Design und Branding-Elemente", "estimatedHours": 24, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
-[QUOTE_RECOMMENDATION]{"service": "Frontend-Entwicklung", "description": "Responsive Umsetzung mit modernen Technologien", "estimatedHours": 40, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
-
-Komplexitätsstufen: "niedrig", "mittel", "hoch", "sehr hoch"
-
-Analysiere die Konversation sorgfältig und erstelle nur dann Angebote, wenn der Kunde wirklich bereit ist.`;
+Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
 
     const fullMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -86,7 +68,7 @@ Analysiere die Konversation sorgfältig und erstelle nur dann Angebote, wenn der
         model: 'gpt-4o-mini',
         messages: fullMessages,
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 500, // Reduziert für kürzere Antworten
         stream: true,
       }),
     });
@@ -95,13 +77,14 @@ Analysiere die Konversation sorgfältig und erstelle nur dann Angebote, wenn der
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    // Create a ReadableStream for real streaming
+    // Verbesserte Stream-Verarbeitung
     const stream = new ReadableStream({
       async start(controller) {
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
         let fullResponse = '';
+        let processedChunks = new Set(); // Verhindert Duplikate
 
         try {
           while (true) {
@@ -116,7 +99,7 @@ Analysiere die Konversation sorgfältig und erstelle nur dann Angebote, wenn der
               if (line.startsWith('data: ')) {
                 const data = line.slice(6);
                 if (data === '[DONE]') {
-                  // Process final response for quote recommendations
+                  // Quote-Empfehlungen verarbeiten
                   const quoteMatches = fullResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/g);
                   if (quoteMatches) {
                     console.log('Found', quoteMatches.length, 'quote recommendations');
@@ -127,7 +110,6 @@ Analysiere die Konversation sorgfältig und erstelle nur dann Angebote, wenn der
                         const quoteRecommendation = JSON.parse(jsonStr);
                         console.log('Quote recommendation extracted:', quoteRecommendation);
                         
-                        // Send quote recommendation separately
                         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                           type: 'quote_recommendation',
                           data: quoteRecommendation
@@ -147,24 +129,28 @@ Analysiere die Konversation sorgfältig und erstelle nur dann Angebote, wenn der
                   const parsed = JSON.parse(data);
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (content) {
+                    // Duplikate-Check
+                    const chunkId = parsed.id + '_' + (parsed.choices?.[0]?.index || 0);
+                    if (processedChunks.has(chunkId)) {
+                      continue;
+                    }
+                    processedChunks.add(chunkId);
+
                     fullResponse += content;
                     
-                    // Verbesserte Filterung: Entferne alle Quote-Tags vollständig
+                    // Quote-Tags entfernen
                     let cleanContent = content;
-                    
-                    // Entferne öffnende Tags
                     cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
-                    // Entferne schließende Tags
                     cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
-                    // Entferne auch partielle Tags die über Chunks verteilt sein könnten
                     cleanContent = cleanContent.replace(/\[QUOTE_RECOMM[^]]*$/g, '');
                     cleanContent = cleanContent.replace(/^[^]]*ENDATION\]/g, '');
                     
-                    // Sende nur sauberen Content
-                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                      type: 'content',
-                      data: cleanContent
-                    })}\n\n`));
+                    if (cleanContent) {
+                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                        type: 'content',
+                        data: cleanContent
+                      })}\n\n`));
+                    }
                   }
                 } catch (e) {
                   // Skip malformed JSON
