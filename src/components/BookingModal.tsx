@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,18 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Clock, User, Mail, Phone, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { useQuotes } from '@/hooks/useQuotes';
+import { useQuotes, QuoteItem } from '@/hooks/useQuotes';
 import { supabase } from '@/integrations/supabase/client';
 import { createQuoteAccessToken } from '@/utils/tokenGenerator';
-
-interface QuoteItem {
-  id: number;
-  service: string;
-  description: string;
-  price: number;
-  estimatedHours?: number;
-  complexity?: string;
-}
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -41,7 +31,7 @@ export function BookingModal({ isOpen, onClose, currentQuoteItems = [] }: Bookin
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const { quotes } = useQuotes();
+  const { quotes, saveQuote } = useQuotes();
 
   const availableTimes = [
     '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'
@@ -95,7 +85,6 @@ export function BookingModal({ isOpen, onClose, currentQuoteItems = [] }: Bookin
       // If it's the current quote (not saved yet), save it first
       if (selectedQuoteId === 'current' && selectedQuote) {
         // Save the current quote first
-        const { saveQuote } = useQuotes();
         const savedQuote = await saveQuote(currentQuoteItems, selectedQuote.title);
         
         if (savedQuote) {
