@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import { Quote } from '@/hooks/useQuotes';
 
@@ -13,9 +12,9 @@ export const generateQuotePDF = (quote: Quote) => {
   // Add Titillium Web font (we'll use a similar font that's available in jsPDF)
   doc.setFont('helvetica');
   
-  // Header with gradient-like background effect using dark blue with rounded corners
+  // Header with gradient-like background effect using dark blue without rounded corners
   doc.setFillColor(15, 25, 35); // digitalwert-background dark blue
-  drawRoundedRect(doc, 0, 0, 210, 35, 3, 'F');
+  doc.rect(0, 0, 210, 35, 'F');
   
   // Company name in header
   doc.setFontSize(24);
