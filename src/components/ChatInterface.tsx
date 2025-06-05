@@ -1,11 +1,9 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Bot, User, AlertTriangle, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: number;
@@ -45,6 +43,20 @@ const renderMarkdown = (text: string) => {
     }
     return part;
   });
+};
+
+// Calculate price based on estimated hours and complexity
+const calculatePrice = (estimatedHours: number, complexity: string): number => {
+  const baseHourlyRate = 120; // €120 per hour base rate
+  const complexityMultipliers = {
+    'niedrig': 1.0,
+    'mittel': 1.3,
+    'hoch': 1.6,
+    'sehr hoch': 2.0
+  };
+  
+  const multiplier = complexityMultipliers[complexity as keyof typeof complexityMultipliers] || 1.3;
+  return Math.round(estimatedHours * baseHourlyRate * multiplier);
 };
 
 export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
@@ -171,10 +183,19 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 } else if (parsed.type === 'quote_recommendation') {
                   console.log('Adding quote recommendation:', parsed.data);
                   setTimeout(() => {
-                    onAddQuoteItem({
-                      ...parsed.data,
+                    const recommendation = parsed.data;
+                    // Transform AI recommendation to match QuoteItem interface
+                    const quoteItem = {
+                      service: recommendation.service,
+                      description: recommendation.description,
+                      estimatedHours: recommendation.estimatedHours,
+                      complexity: recommendation.complexity,
+                      price: recommendation.estimatedHours && recommendation.complexity 
+                        ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
+                        : 0,
                       id: Date.now()
-                    });
+                    };
+                    onAddQuoteItem(quoteItem);
                   }, 1000);
                 }
               } catch (e) {

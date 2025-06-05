@@ -12,6 +12,8 @@ interface QuoteItem {
   service: string;
   description: string;
   price: number;
+  estimatedHours?: number;
+  complexity?: string;
 }
 
 interface QuotePanelProps {
@@ -26,7 +28,7 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
   const { toast } = useToast();
   const [quoteNumber] = useState(`DW-${Date.now().toString().slice(-6)}`);
 
-  const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
+  const totalPrice = items.reduce((sum, item) => sum + (item.price || 0), 0);
 
   const handleDownloadPDF = () => {
     if (items.length === 0) {
@@ -48,7 +50,7 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
         items: items.map(item => ({
           service: item.service,
           description: item.description,
-          price: item.price
+          price: item.price || 0
         })),
         created_at: new Date().toISOString()
       };
@@ -94,10 +96,20 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
                     <div className="flex-1">
                       <h4 className="font-semibold text-white">{item.service}</h4>
                       <p className="text-sm text-slate-300 mt-1">{item.description}</p>
+                      {item.estimatedHours && (
+                        <p className="text-xs text-slate-400 mt-1">
+                          Geschätzte Stunden: {item.estimatedHours}
+                        </p>
+                      )}
+                      {item.complexity && (
+                        <p className="text-xs text-slate-400">
+                          Komplexität: {item.complexity}
+                        </p>
+                      )}
                     </div>
                     <div className="text-right ml-4">
                       <p className="font-bold text-lg text-digitalwert-primary">
-                        {item.price.toLocaleString('de-DE')} €
+                        {item.price ? `${item.price.toLocaleString('de-DE')} €` : 'Preis auf Anfrage'}
                       </p>
                       <Button
                         variant="ghost"
@@ -121,14 +133,18 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
             <div className="space-y-4">
               <div className="flex justify-between items-center text-lg font-bold">
                 <span className="text-white">Gesamtsumme (netto):</span>
-                <span className="text-digitalwert-primary">{totalPrice.toLocaleString('de-DE')} €</span>
+                <span className="text-digitalwert-primary">
+                  {totalPrice > 0 ? `${totalPrice.toLocaleString('de-DE')} €` : 'Preis auf Anfrage'}
+                </span>
               </div>
-              <div className="text-sm text-slate-300">
-                <p>+ 19% MwSt.: {Math.round(totalPrice * 0.19).toLocaleString('de-DE')} €</p>
-                <p className="font-semibold text-white">
-                  Gesamtbetrag: {Math.round(totalPrice * 1.19).toLocaleString('de-DE')} €
-                </p>
-              </div>
+              {totalPrice > 0 && (
+                <div className="text-sm text-slate-300">
+                  <p>+ 19% MwSt.: {Math.round(totalPrice * 0.19).toLocaleString('de-DE')} €</p>
+                  <p className="font-semibold text-white">
+                    Gesamtbetrag: {Math.round(totalPrice * 1.19).toLocaleString('de-DE')} €
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-2">
                 <Button onClick={handleDownloadPDF} className="w-full">
