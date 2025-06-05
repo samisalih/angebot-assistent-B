@@ -98,7 +98,7 @@ export default function QuoteViewer() {
         id: quoteData.id,
         quote_number: quoteData.quote_number,
         title: quoteData.title || 'Angebot',
-        status: quoteData.status || 'draft',
+        status: (quoteData.status as 'draft' | 'sent' | 'accepted' | 'rejected') || 'draft',
         total_amount: Number(quoteData.total_amount),
         created_at: quoteData.created_at,
         items: quoteData.quote_items?.map(item => ({
