@@ -61,7 +61,6 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"
 
 WICHTIG: 
 - Die QUOTES Sektion kommt NUR am Ende, NACH der normalen Antwort
-- Verwende NIEMALS [QUOTE_RECOMMENDATION] oder ähnliche Marker im normalen Text
 - Jedes Angebot MUSS mehrere Positionen haben`;
 
     const fullMessages: ChatMessage[] = [
@@ -82,7 +81,6 @@ WICHTIG:
         messages: fullMessages,
         temperature: 0.7,
         max_tokens: 1500,
-        stream: true,
       }),
     });
 
@@ -92,137 +90,67 @@ WICHTIG:
       throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
-    console.log('OpenAI response received, starting stream');
+    const data = await response.json();
+    const fullResponse = data.choices[0].message.content;
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error('No response body reader available');
-        }
+    console.log('OpenAI response received. Full response length:', fullResponse.length);
 
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let fullResponse = '';
+    // Trennung der Antwort in Chat-Text und Quotes
+    const quotesMatch = fullResponse.match(/---QUOTES---([\s\S]*?)---END-QUOTES---/);
+    let cleanChatResponse = fullResponse;
+    let quoteRecommendations = [];
 
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              console.log('Stream completed. Full response length:', fullResponse.length);
+    if (quotesMatch && quotesMatch[1]) {
+      console.log('Found quotes section, processing...');
+      
+      // Entferne die gesamte QUOTES-Sektion aus der Chat-Antwort
+      cleanChatResponse = fullResponse.replace(/---QUOTES---[\s\S]*?---END-QUOTES---/g, '').trim();
+      
+      const quotesSection = quotesMatch[1];
+      const quoteMatches = quotesSection.match(/\[QUOTE\]\s*({[^}]*})\s*\[\/QUOTE\]/g);
+      
+      if (quoteMatches && quoteMatches.length > 0) {
+        console.log('Found', quoteMatches.length, 'quotes to process');
+        
+        for (const match of quoteMatches) {
+          try {
+            const jsonMatch = match.match(/\[QUOTE\]\s*({.*?})\s*\[\/QUOTE\]/);
+            if (jsonMatch && jsonMatch[1]) {
+              const jsonStr = jsonMatch[1];
+              console.log('Attempting to parse quote JSON:', jsonStr);
               
-              // Process quotes from the dedicated section at the end
-              const quotesMatch = fullResponse.match(/---QUOTES---([\s\S]*?)---END-QUOTES---/);
+              const quoteRecommendation = JSON.parse(jsonStr);
+              console.log('Successfully parsed quote recommendation:', quoteRecommendation);
               
-              if (quotesMatch && quotesMatch[1]) {
-                console.log('Found quotes section, processing...');
-                const quotesSection = quotesMatch[1];
-                const quoteMatches = quotesSection.match(/\[QUOTE\]\s*({[^}]*})\s*\[\/QUOTE\]/g);
-                
-                if (quoteMatches && quoteMatches.length > 0) {
-                  console.log('Found', quoteMatches.length, 'quotes to process');
-                  
-                  for (const match of quoteMatches) {
-                    try {
-                      const jsonMatch = match.match(/\[QUOTE\]\s*({.*?})\s*\[\/QUOTE\]/);
-                      if (jsonMatch && jsonMatch[1]) {
-                        const jsonStr = jsonMatch[1];
-                        console.log('Attempting to parse quote JSON:', jsonStr);
-                        
-                        const quoteRecommendation = JSON.parse(jsonStr);
-                        console.log('Successfully parsed quote recommendation:', quoteRecommendation);
-                        
-                        if (quoteRecommendation.service && quoteRecommendation.description) {
-                          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                            type: 'quote_recommendation',
-                            data: quoteRecommendation
-                          })}\n\n`));
-                          console.log('Quote recommendation sent successfully');
-                        } else {
-                          console.warn('Quote recommendation missing required fields:', quoteRecommendation);
-                        }
-                      }
-                    } catch (e) {
-                      console.error('Failed to parse quote recommendation:', e, 'Raw match:', match);
-                    }
-                  }
-                } else {
-                  console.log('No valid quotes found in quotes section');
-                }
+              if (quoteRecommendation.service && quoteRecommendation.description) {
+                quoteRecommendations.push(quoteRecommendation);
+                console.log('Quote recommendation added successfully');
               } else {
-                console.log('No quotes section found in response');
-              }
-              
-              controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-              controller.close();
-              return;
-            }
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6).trim();
-                
-                if (data === '[DONE]') {
-                  continue;
-                }
-
-                if (data) {
-                  try {
-                    const parsed = JSON.parse(data);
-                    const content = parsed.choices?.[0]?.delta?.content;
-                    
-                    if (content) {
-                      fullResponse += content;
-                      
-                      // Clean streaming content - remove quotes section completely from display
-                      let cleanContent = content;
-                      
-                      // Remove the entire quotes section from streaming display
-                      cleanContent = cleanContent.replace(/---QUOTES---[\s\S]*?---END-QUOTES---/g, '');
-                      
-                      // Remove any partial quote markers that might appear during streaming
-                      cleanContent = cleanContent.replace(/---QUOTES---.*$/g, '');
-                      cleanContent = cleanContent.replace(/\[QUOTE\].*?\[\/QUOTE\]/g, '');
-                      cleanContent = cleanContent.replace(/\[QUOTE\]/g, '');
-                      cleanContent = cleanContent.replace(/\[\/QUOTE\]/g, '');
-                      cleanContent = cleanContent.replace(/---END-QUOTES---/g, '');
-                      
-                      // Only send if there's content after filtering
-                      if (cleanContent.trim()) {
-                        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                          type: 'content',
-                          data: cleanContent
-                        })}\n\n`));
-                      }
-                    }
-                  } catch (e) {
-                    console.error('Failed to parse streaming data:', e, 'Raw data:', data);
-                  }
-                }
+                console.warn('Quote recommendation missing required fields:', quoteRecommendation);
               }
             }
+          } catch (e) {
+            console.error('Failed to parse quote recommendation:', e, 'Raw match:', match);
           }
-        } catch (error) {
-          console.error('Stream reading error:', error);
-          controller.error(error);
-        } finally {
-          reader.releaseLock();
         }
+      } else {
+        console.log('No valid quotes found in quotes section');
       }
-    });
+    } else {
+      console.log('No quotes section found in response');
+    }
 
-    return new Response(stream, {
+    // Sende sowohl Chat-Antwort als auch Quote-Empfehlungen zurück
+    return new Response(JSON.stringify({
+      message: cleanChatResponse,
+      quoteRecommendations: quoteRecommendations
+    }), {
       headers: {
         ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        'Content-Type': 'application/json',
       },
     });
+
   } catch (error) {
     console.error('Error in chat-with-ai function:', error);
     return new Response(JSON.stringify({ 

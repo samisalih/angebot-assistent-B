@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,6 @@ interface Message {
   text: string;
   isBot: boolean;
   timestamp: Date;
-  isStreaming?: boolean;
 }
 
 interface ChatInterfaceProps {
@@ -97,9 +97,9 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
     return true;
   };
 
-  const getStreamingAIResponse = async (userMessage: string) => {
+  const getAIResponse = async (userMessage: string) => {
     try {
-      const chatHistory = messages.filter(msg => !msg.isStreaming).map(msg => ({
+      const chatHistory = messages.map(msg => ({
         role: msg.isBot ? 'assistant' : 'user',
         content: msg.text
       }));
@@ -109,7 +109,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
         content: userMessage
       });
 
-      console.log('Sending streaming chat request to AI...');
+      console.log('Sending chat request to AI...');
       
       const response = await fetch(`https://rtxvbdvhzjsktmhdfdfv.supabase.co/functions/v1/chat-with-ai`, {
         method: 'POST',
@@ -120,117 +120,50 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
         body: JSON.stringify({ messages: chatHistory })
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error('Streaming response failed');
+      if (!response.ok) {
+        throw new Error('AI response failed');
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+      const data = await response.json();
+      console.log('AI response received:', data);
 
-      const streamingMessageId = Date.now() + 1;
-      const initialMessage: Message = {
-        id: streamingMessageId,
-        text: '',
-        isBot: true,
-        timestamp: new Date(),
-        isStreaming: true
-      };
-
-      setMessages(prev => [...prev, initialMessage]);
-
-      let buffer = '';
-      let accumulatedText = '';
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') {
-                setMessages(prev => prev.map(msg => 
-                  msg.id === streamingMessageId 
-                    ? { ...msg, text: accumulatedText.trim(), isStreaming: false }
-                    : msg
-                ));
-                return;
-              }
-
-              try {
-                const parsed = JSON.parse(data);
-                console.log('Received parsed data:', parsed);
-                
-                if (parsed.type === 'content') {
-                  // Content is now already clean from the backend
-                  const cleanContent = parsed.data;
-                  
-                  if (cleanContent.trim()) {
-                    accumulatedText += cleanContent;
-                    
-                    setMessages(prev => prev.map(msg => 
-                      msg.id === streamingMessageId 
-                        ? { ...msg, text: accumulatedText }
-                        : msg
-                    ));
-                  }
-                } else if (parsed.type === 'quote_recommendation') {
-                  console.log('!!! QUOTE RECOMMENDATION RECEIVED !!!', parsed.data);
-                  
-                  const recommendation = parsed.data;
-                  
-                  // Validierung der Recommendation-Daten
-                  if (recommendation && recommendation.service) {
-                    console.log('Processing valid quote recommendation:', recommendation);
-                    
-                    const price = recommendation.estimatedHours && recommendation.complexity 
-                      ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
-                      : 0;
-                    
-                    const quoteItem = {
-                      service: recommendation.service,
-                      description: recommendation.description || 'Detaillierte Beschreibung folgt',
-                      estimatedHours: recommendation.estimatedHours || 0,
-                      complexity: recommendation.complexity || 'mittel',
-                      price: price,
-                      id: Date.now() + Math.random()
-                    };
-                    
-                    console.log('!!! ADDING QUOTE ITEM TO PANEL !!!', quoteItem);
-                    
-                    // Sofort hinzufügen
-                    onAddQuoteItem(quoteItem);
-                    
-                    // Visual feedback in console
-                    console.log('✅ Quote item successfully added to panel');
-                  } else {
-                    console.warn('Invalid quote recommendation received:', recommendation);
-                  }
-                }
-              } catch (e) {
-                console.warn('Failed to parse streaming data:', e, 'Raw data:', data);
-              }
-            }
+      // Verarbeite Quote-Empfehlungen
+      if (data.quoteRecommendations && data.quoteRecommendations.length > 0) {
+        console.log('Processing', data.quoteRecommendations.length, 'quote recommendations');
+        
+        data.quoteRecommendations.forEach((recommendation: any) => {
+          console.log('Processing quote recommendation:', recommendation);
+          
+          if (recommendation && recommendation.service) {
+            const price = recommendation.estimatedHours && recommendation.complexity 
+              ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
+              : 0;
+            
+            const quoteItem = {
+              service: recommendation.service,
+              description: recommendation.description || 'Detaillierte Beschreibung folgt',
+              estimatedHours: recommendation.estimatedHours || 0,
+              complexity: recommendation.complexity || 'mittel',
+              price: price,
+              id: Date.now() + Math.random()
+            };
+            
+            console.log('Adding quote item to panel:', quoteItem);
+            onAddQuoteItem(quoteItem);
           }
-        }
-      } catch (streamError) {
-        console.error('Stream reading error:', streamError);
-        throw streamError;
+        });
       }
+
+      return data.message || 'Entschuldigung, es gab einen Fehler bei der Verarbeitung Ihrer Anfrage.';
 
     } catch (error) {
-      console.error('Error getting streaming AI response:', error);
+      console.error('Error getting AI response:', error);
       return 'Entschuldigung, es gab einen technischen Fehler. Bitte versuchen Sie es erneut.';
     }
   };
 
   const handleSend = async () => {
-    const sanitizedInput = sanitizeInput(input.trim()); // Only trim but don't remove internal spaces
+    const sanitizedInput = sanitizeInput(input.trim());
     
     if (!sanitizedInput.trim()) return;
     
@@ -257,7 +190,16 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
     setIsTyping(true);
 
     try {
-      await getStreamingAIResponse(sanitizedInput);
+      const aiResponse = await getAIResponse(sanitizedInput);
+      
+      const aiMessage: Message = {
+        id: Date.now() + 1,
+        text: aiResponse,
+        isBot: true,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Error in handleSend:', error);
       const errorResponse: Message = {
@@ -280,7 +222,6 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Don't sanitize during typing, only when sending
     setInput(e.target.value.substring(0, 2000));
   };
 
@@ -319,9 +260,6 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                     <div className="flex-1 min-w-0">
                       <div className="whitespace-pre-line break-words leading-relaxed">
                         {message.isBot ? renderMarkdown(message.text) : message.text}
-                        {message.isStreaming && (
-                          <span className="inline-block w-2 h-5 bg-digitalwert-primary animate-pulse ml-1" />
-                        )}
                       </div>
                       <p className="text-xs opacity-70 mt-2">
                         {message.timestamp.toLocaleTimeString()}
