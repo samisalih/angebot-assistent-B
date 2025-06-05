@@ -1,9 +1,20 @@
+
 import jsPDF from 'jspdf';
 import { Quote } from '@/hooks/useQuotes';
 
 // Helper function to draw rounded rectangles
 const drawRoundedRect = (doc: jsPDF, x: number, y: number, width: number, height: number, radius: number, style: string = 'S') => {
   doc.roundedRect(x, y, width, height, radius, radius, style);
+};
+
+// Helper function to check if we need a new page and add one if necessary
+const checkAndAddNewPage = (doc: jsPDF, currentY: number, requiredHeight: number = 20) => {
+  const pageHeight = doc.internal.pageSize.height;
+  if (currentY + requiredHeight > pageHeight - 20) { // 20px margin from bottom
+    doc.addPage();
+    return 40; // Start position on new page
+  }
+  return currentY;
 };
 
 export const generateQuotePDF = (quote: Quote) => {
@@ -75,6 +86,10 @@ export const generateQuotePDF = (quote: Quote) => {
   
   // Items section header
   let yPosition = 130;
+  
+  // Check if we need a new page before starting items section
+  yPosition = checkAndAddNewPage(doc, yPosition, 50);
+  
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0, 0, 0);
@@ -105,23 +120,48 @@ export const generateQuotePDF = (quote: Quote) => {
   let isEvenRow = false;
   
   quote.items?.forEach((item, index) => {
+    // Calculate required height for this item
+    const serviceText = doc.splitTextToSize(item.service, 65);
+    const descriptionText = doc.splitTextToSize(item.description || 'Keine Beschreibung', 50);
+    const lineHeight = Math.max(serviceText.length, descriptionText.length) * 4 + 10;
+    
+    // Check if we need a new page for this item
+    yPosition = checkAndAddNewPage(doc, yPosition, lineHeight);
+    
+    // If we're on a new page, reset the alternating row pattern
+    if (yPosition === 40) {
+      isEvenRow = false;
+      
+      // Redraw table header on new page
+      doc.setFillColor(15, 25, 35);
+      drawRoundedRect(doc, 15, yPosition - 8, 180, 12, 3, 'F');
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text('Leistung', 20, yPosition - 2);
+      doc.text('Beschreibung', 90, yPosition - 2);
+      doc.text('Preis', 170, yPosition - 2);
+      
+      yPosition += 8;
+      doc.setFont('helvetica', 'normal');
+    }
+    
     // Alternating row background with rounded corners
     if (isEvenRow) {
       doc.setFillColor(248, 248, 248);
-      drawRoundedRect(doc, 15, yPosition - 5, 180, 10, 2, 'F');
+      drawRoundedRect(doc, 15, yPosition - 5, 180, lineHeight, 2, 'F');
     }
     
     doc.setTextColor(0, 0, 0);
     
     // Service name (bold)
     doc.setFont('helvetica', 'bold');
-    const serviceText = doc.splitTextToSize(item.service, 65);
     doc.text(serviceText, 20, yPosition);
     
     // Description
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(80, 80, 80);
-    const descriptionText = doc.splitTextToSize(item.description || 'Keine Beschreibung', 50);
     doc.text(descriptionText, 90, yPosition);
     
     // Price (right aligned, colored)
@@ -130,13 +170,15 @@ export const generateQuotePDF = (quote: Quote) => {
     const priceText = `${Number(item.price).toLocaleString('de-DE')} €`;
     doc.text(priceText, 190, yPosition, { align: 'right' });
     
-    const lineHeight = Math.max(serviceText.length, descriptionText.length) * 4 + 6;
     yPosition += lineHeight;
     isEvenRow = !isEvenRow;
   });
   
   // Totals section with modern styling and rounded corners
   yPosition += 10;
+  
+  // Check if we need a new page for totals section
+  yPosition = checkAndAddNewPage(doc, yPosition, 45);
   
   // Total box background with rounded corners
   doc.setFillColor(250, 250, 250);
@@ -176,6 +218,9 @@ export const generateQuotePDF = (quote: Quote) => {
   
   // Footer section
   yPosition += 50;
+  
+  // Check if we need a new page for footer
+  yPosition = checkAndAddNewPage(doc, yPosition, 25);
   
   // Footer background with rounded corners
   doc.setFillColor(245, 245, 245);
