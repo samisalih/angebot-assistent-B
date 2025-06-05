@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -112,7 +113,8 @@ serve(async (req) => {
       preferredTime: sanitizeInput(requestData.preferredTime || '', 50),
       message: sanitizeInput(requestData.message || '', 2000),
       totalAmount: requestData.totalAmount || 0,
-      items: Array.isArray(requestData.items) ? requestData.items.slice(0, 20) : [] // Limit items
+      items: Array.isArray(requestData.items) ? requestData.items.slice(0, 20) : [], // Limit items
+      quoteAccessToken: sanitizeInput(requestData.quoteAccessToken || '', 100)
     };
 
     console.log('Processing sanitized booking data for:', sanitizedData.customerEmail);
@@ -270,10 +272,15 @@ serve(async (req) => {
       console.log("Customer email sent successfully:", customerEmailResponse.data?.id);
     }
 
+    // Generate quote view URL if token is available
+    const quoteViewUrl = sanitizedData.quoteAccessToken 
+      ? `https://id-preview--2cdddf6e-1d14-49c9-aab9-6ca72b1af309.lovable.app/quote/view/${sanitizedData.quoteAccessToken}`
+      : null;
+
     // Prepare internal notification email using verified resend.dev domain
     const internalEmailData: any = {
       from: 'Digitalwert Booking System <onboarding@resend.dev>',
-      to: ['me@samisalih.com'], // Changed from 97samisalih@gmail.com to me@samisalih.com
+      to: ['me@samisalih.com'],
       subject: `🔔 Neue Terminanfrage - ${sanitizedData.service}`,
       html: `
         <!DOCTYPE html>
@@ -312,6 +319,22 @@ serve(async (req) => {
                   <p style="margin: 0 0 8px 0; color: #374151;"><strong>Angefragt am:</strong> ${new Date().toLocaleString('de-DE')}</p>
                 </div>
               </div>
+              
+              ${quoteViewUrl ? `
+              <!-- Quote Access -->
+              <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 24px 0;">
+                <h4 style="color: #1e40af; margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">📄 Angebot ansehen:</h4>
+                <p style="margin: 0 0 12px 0; color: #1e40af;">
+                  Das zugehörige Angebot können Sie hier direkt im Browser ansehen:
+                </p>
+                <div style="text-align: center;">
+                  <a href="${quoteViewUrl}" 
+                     style="display: inline-block; background-color: #3b82f6; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+                    🔗 Angebot ansehen
+                  </a>
+                </div>
+              </div>
+              ` : ''}
               
               ${sanitizedData.items.length > 0 ? `
               <!-- Quote Items -->
@@ -384,7 +407,8 @@ serve(async (req) => {
       customerEmailId: customerEmailResponse.data?.id,
       internalEmailId: internalEmailResponse.data?.id,
       customerEmailError: customerEmailResponse.error,
-      internalEmailError: internalEmailResponse.error
+      internalEmailError: internalEmailResponse.error,
+      quoteViewUrl: quoteViewUrl
     }), {
       status: 200,
       headers: {

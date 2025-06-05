@@ -96,6 +96,44 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_access_tokens: {
+        Row: {
+          access_count: number
+          accessed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          quote_id: string
+          token: string
+        }
+        Insert: {
+          access_count?: number
+          accessed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          quote_id: string
+          token: string
+        }
+        Update: {
+          access_count?: number
+          accessed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          quote_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_access_tokens_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_items: {
         Row: {
           created_at: string | null

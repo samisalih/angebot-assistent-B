@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuotes } from '@/hooks/useQuotes';
 import { supabase } from '@/integrations/supabase/client';
+import { createQuoteAccessToken } from '@/utils/tokenGenerator';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -88,6 +88,14 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
         return;
       }
 
+      // Generate access token for the quote
+      const accessToken = await createQuoteAccessToken(selectedQuoteId);
+      
+      if (!accessToken) {
+        console.error('Failed to create access token');
+        // Continue without token - booking is still valid
+      }
+
       // Prepare data for email sending that matches the edge function validation
       const emailData = {
         customerName: formData.name,
@@ -102,7 +110,9 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
           service: selectedQuote.title,
           description: `Angebot ${selectedQuote.quote_number}`,
           price: selectedQuote.total_amount
-        }] : []
+        }] : [],
+        // Add the access token for the admin email
+        quoteAccessToken: accessToken
       };
 
       console.log('Sending email data:', emailData);
