@@ -103,9 +103,8 @@ WICHTIG: Verwende die Quote-Empfehlungen auch bei kleineren Projekten oder Nachf
             const { done, value } = await reader.read();
             if (done) {
               console.log('Stream completed. Full response length:', fullResponse.length);
-              console.log('Full response content for quote processing:', fullResponse);
               
-              // Process quote recommendations at the end with improved regex
+              // Process quote recommendations at the end
               const quoteMatches = fullResponse.match(/\[QUOTE_RECOMMENDATION\]\s*({[^}]*})\s*\[\/QUOTE_RECOMMENDATION\]/g);
               
               if (quoteMatches && quoteMatches.length > 0) {
@@ -113,7 +112,6 @@ WICHTIG: Verwende die Quote-Empfehlungen auch bei kleineren Projekten oder Nachf
                 
                 for (const match of quoteMatches) {
                   try {
-                    // Extract JSON more carefully
                     const jsonMatch = match.match(/\[QUOTE_RECOMMENDATION\]\s*({.*?})\s*\[\/QUOTE_RECOMMENDATION\]/);
                     if (jsonMatch && jsonMatch[1]) {
                       const jsonStr = jsonMatch[1];
@@ -122,7 +120,6 @@ WICHTIG: Verwende die Quote-Empfehlungen auch bei kleineren Projekten oder Nachf
                       const quoteRecommendation = JSON.parse(jsonStr);
                       console.log('Successfully parsed quote recommendation:', quoteRecommendation);
                       
-                      // Validate that required fields exist
                       if (quoteRecommendation.service && quoteRecommendation.description) {
                         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                           type: 'quote_recommendation',
@@ -139,7 +136,6 @@ WICHTIG: Verwende die Quote-Empfehlungen auch bei kleineren Projekten oder Nachf
                 }
               } else {
                 console.log('No quote recommendations found in response');
-                console.log('Response text to check:', fullResponse.substring(0, 500), '...');
               }
               
               controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
@@ -167,14 +163,20 @@ WICHTIG: Verwende die Quote-Empfehlungen auch bei kleineren Projekten oder Nachf
                     if (content) {
                       fullResponse += content;
                       
-                      // Clean content for display (remove quote markers from streaming text)
+                      // Komplett filtern: Alle Quote-bezogenen Inhalte aus dem Stream entfernen
                       let cleanContent = content;
-                      // Remove complete quote blocks from the streaming display
-                      cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
-                      // Remove partial markers
+                      
+                      // Entferne komplette Quote-Blöcke
+                      cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/gs, '');
+                      
+                      // Entferne einzelne Quote-Marker
                       cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
                       cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
                       
+                      // Entferne auch partielle JSON-Strukturen die zu Quotes gehören
+                      cleanContent = cleanContent.replace(/\{"service":[^}]*\}/g, '');
+                      
+                      // Nur senden wenn nach der Filterung noch Inhalt vorhanden ist
                       if (cleanContent.trim()) {
                         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                           type: 'content',
