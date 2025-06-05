@@ -74,7 +74,7 @@ export function QuotePanel({ items, onRemoveItem, onBooking, onSaveQuote, user }
   };
 
   return (
-    <Card className="h-[600px] flex flex-col bg-digitalwert-background border-digitalwert-background-lighter">
+    <Card className="h-full flex flex-col bg-digitalwert-background border-digitalwert-background-lighter">
       <CardHeader className="flex-shrink-0">
         <CardTitle className="text-white">Kostenvoranschlag</CardTitle>
         <p className="text-sm text-slate-400">Angebot Nr.: {quoteNumber}</p>

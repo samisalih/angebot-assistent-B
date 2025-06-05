@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -276,7 +277,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
   };
 
   return (
-    <Card className="h-[600px] flex flex-col bg-digitalwert-background border-digitalwert-background-lighter">
+    <Card className="h-full flex flex-col bg-digitalwert-background border-digitalwert-background-lighter">
       <CardHeader className="flex-shrink-0">
         <CardTitle className="flex items-center gap-2 text-white">
           <Bot className="w-5 h-5 text-digitalwert-primary" />
