@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,10 +14,18 @@ interface AdminPanelProps {
   onClose: () => void;
 }
 
+interface Service {
+  id: number;
+  name: string;
+  description: string;
+  baseHours: number;
+  hourlyRate: number;
+}
+
 export function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [services, setServices] = useState([
+  const [services, setServices] = useState<Service[]>([
     { id: 1, name: 'Webauftritt Basic', description: 'Einfache responsive Website', baseHours: 30, hourlyRate: 85 },
     { id: 2, name: 'Webauftritt Professional', description: 'Professionelle Website mit CMS', baseHours: 50, hourlyRate: 85 },
     { id: 3, name: 'E-Commerce Shop', description: 'Vollständiges Shop-System', baseHours: 80, hourlyRate: 85 },
@@ -26,6 +33,7 @@ export function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
     { id: 5, name: 'UI/UX Design', description: 'Interface Design und Prototyping', baseHours: 40, hourlyRate: 95 },
   ]);
   const [newService, setNewService] = useState({ name: '', description: '', baseHours: 0, hourlyRate: 85 });
+  const [editingService, setEditingService] = useState<Service | null>(null);
   const [agbText, setAgbText] = useState(`Allgemeine Geschäftsbedingungen der Digitalwert GmbH
 
 1. Geltungsbereich
@@ -112,6 +120,36 @@ BESONDERHEITEN:
       title: "Service hinzugefügt",
       description: `${service.name} wurde erfolgreich hinzugefügt.`,
     });
+  };
+
+  const handleEditService = (service: Service) => {
+    setEditingService(service);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingService || !editingService.name || !editingService.description || editingService.baseHours <= 0 || editingService.hourlyRate <= 0) {
+      toast({
+        title: "Fehler",
+        description: "Bitte füllen Sie alle Felder korrekt aus.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setServices(prev => prev.map(service => 
+      service.id === editingService.id ? editingService : service
+    ));
+    
+    setEditingService(null);
+    
+    toast({
+      title: "Service aktualisiert",
+      description: `${editingService.name} wurde erfolgreich aktualisiert.`,
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingService(null);
   };
 
   const handleDeleteService = (id: number) => {
@@ -231,26 +269,63 @@ BESONDERHEITEN:
                 <div className="space-y-2">
                   {services.map((service) => (
                     <div key={service.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{service.name}</h4>
-                        <p className="text-sm text-slate-600">{service.description}</p>
-                        <p className="text-xs text-slate-500">
-                          {service.baseHours}h × {service.hourlyRate}€/h = ca. {(service.baseHours * service.hourlyRate).toLocaleString('de-DE')}€
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleDeleteService(service.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      {editingService && editingService.id === service.id ? (
+                        <div className="flex-1 grid md:grid-cols-4 gap-4">
+                          <Input
+                            value={editingService.name}
+                            onChange={(e) => setEditingService(prev => prev ? { ...prev, name: e.target.value } : null)}
+                            placeholder="Service Name"
+                          />
+                          <Input
+                            value={editingService.description}
+                            onChange={(e) => setEditingService(prev => prev ? { ...prev, description: e.target.value } : null)}
+                            placeholder="Beschreibung"
+                          />
+                          <Input
+                            type="number"
+                            value={editingService.baseHours}
+                            onChange={(e) => setEditingService(prev => prev ? { ...prev, baseHours: parseInt(e.target.value) || 0 } : null)}
+                            placeholder="Basis Stunden"
+                          />
+                          <div className="flex gap-2">
+                            <Input
+                              type="number"
+                              value={editingService.hourlyRate}
+                              onChange={(e) => setEditingService(prev => prev ? { ...prev, hourlyRate: parseInt(e.target.value) || 0 } : null)}
+                              placeholder="Stundensatz (€)"
+                            />
+                            <Button onClick={handleSaveEdit} size="sm" className="bg-green-600 hover:bg-green-700">
+                              Speichern
+                            </Button>
+                            <Button onClick={handleCancelEdit} size="sm" variant="outline">
+                              Abbrechen
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex-1">
+                            <h4 className="font-medium">{service.name}</h4>
+                            <p className="text-sm text-slate-600">{service.description}</p>
+                            <p className="text-xs text-slate-500">
+                              {service.baseHours}h × {service.hourlyRate}€/h = ca. {(service.baseHours * service.hourlyRate).toLocaleString('de-DE')}€
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleEditService(service)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => handleDeleteService(service.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
