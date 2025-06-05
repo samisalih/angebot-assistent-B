@@ -3,9 +3,6 @@ import { Calendar, FileText, User, Home } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -46,28 +43,26 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Mein Bereich</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location.pathname === item.url}
-                  >
-                    <button onClick={() => navigate(item.url)}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </button>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+    <Sidebar collapsible="none" className="w-16 border-r border-digitalwert-background-lighter">
+      <SidebarContent className="bg-digitalwert-background">
+        <div className="flex flex-col items-center py-4 space-y-4">
+          <SidebarMenu>
+            {menuItems.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === item.url}
+                  tooltip={item.title}
+                  className="w-12 h-12 rounded-lg flex items-center justify-center hover:bg-digitalwert-background-light data-[active=true]:bg-digitalwert-primary data-[active=true]:text-white"
+                >
+                  <button onClick={() => navigate(item.url)}>
+                    <item.icon className="w-6 h-6" />
+                  </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </div>
       </SidebarContent>
     </Sidebar>
   );
