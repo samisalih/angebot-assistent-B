@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -141,7 +140,6 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
 
       let buffer = '';
       let accumulatedText = '';
-      let processedQuotes = new Set(); // Verhindert doppelte Quote-Empfehlungen
 
       try {
         while (true) {
@@ -168,14 +166,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 const parsed = JSON.parse(data);
                 
                 if (parsed.type === 'content') {
-                  let cleanContent = parsed.data;
-                  
-                  // Zusätzliche client-seitige Filterung
-                  cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
-                  cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
-                  cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
-                  
-                  accumulatedText += cleanContent;
+                  accumulatedText += parsed.data;
                   
                   setMessages(prev => prev.map(msg => 
                     msg.id === streamingMessageId 
@@ -183,29 +174,28 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                       : msg
                   ));
                 } else if (parsed.type === 'quote_recommendation') {
-                  const quoteId = `${parsed.data.service}_${parsed.data.estimatedHours}`;
-                  if (!processedQuotes.has(quoteId)) {
-                    processedQuotes.add(quoteId);
-                    console.log('Adding unique quote recommendation:', parsed.data);
-                    
-                    setTimeout(() => {
-                      const recommendation = parsed.data;
-                      const quoteItem = {
-                        service: recommendation.service,
-                        description: recommendation.description,
-                        estimatedHours: recommendation.estimatedHours,
-                        complexity: recommendation.complexity,
-                        price: recommendation.estimatedHours && recommendation.complexity 
-                          ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
-                          : 0,
-                        id: Date.now() + Math.random()
-                      };
-                      onAddQuoteItem(quoteItem);
-                    }, 1000);
-                  }
+                  console.log('Received quote recommendation:', parsed.data);
+                  
+                  // Sofort Quote-Item hinzufügen
+                  const recommendation = parsed.data;
+                  const price = recommendation.estimatedHours && recommendation.complexity 
+                    ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
+                    : 0;
+                  
+                  const quoteItem = {
+                    service: recommendation.service || 'Beratungsleistung',
+                    description: recommendation.description || 'Detaillierte Beschreibung folgt',
+                    estimatedHours: recommendation.estimatedHours || 0,
+                    complexity: recommendation.complexity || 'mittel',
+                    price: price,
+                    id: Date.now() + Math.random()
+                  };
+                  
+                  console.log('Adding quote item:', quoteItem);
+                  onAddQuoteItem(quoteItem);
                 }
               } catch (e) {
-                // Skip malformed JSON
+                console.warn('Failed to parse streaming data:', e, 'Raw data:', data);
               }
             }
           }
