@@ -167,11 +167,8 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 console.log('Received parsed data:', parsed);
                 
                 if (parsed.type === 'content') {
-                  // Content ohne Quote-Marker hinzufügen
-                  let cleanContent = parsed.data;
-                  cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
-                  cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
-                  cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
+                  // Content is now already clean from the backend
+                  const cleanContent = parsed.data;
                   
                   if (cleanContent.trim()) {
                     accumulatedText += cleanContent;

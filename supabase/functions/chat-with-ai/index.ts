@@ -43,19 +43,26 @@ WICHTIGE REGELN:
 4. ERWÄHNE NIEMALS Preise
 5. Fokus auf Lösungsfindung
 
-ANGEBOTSERSTELLUNG - IMMER wenn der Nutzer ein konkretes Projekt beschreibt:
-- Erstelle SOFORT detaillierte Angebote
-- Verwende IMMER das QUOTE_RECOMMENDATION Format
-- JEDES Angebot MUSS mehrere Positionen haben
+ANTWORT-FORMAT:
+- Gib ZUERST eine normale, hilfreiche Antwort
+- DANN, wenn du ein Angebot erstellen sollst, füge am ENDE deiner Antwort eine separate QUOTES Sektion hinzu
 
-Format für Angebote (EXAKT so verwenden):
-[QUOTE_RECOMMENDATION]{"service": "Konzeption & Wireframes", "description": "Erstellung von Wireframes und Konzept für die Website-Struktur", "estimatedHours": 16, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
-[QUOTE_RECOMMENDATION]{"service": "Design & Branding", "description": "Visuelles Design und Corporate Identity Entwicklung", "estimatedHours": 24, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
-[QUOTE_RECOMMENDATION]{"service": "Frontend-Entwicklung", "description": "Responsive Umsetzung der Website mit modernen Technologien", "estimatedHours": 40, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
+ANGEBOTSERSTELLUNG - NUR wenn der Nutzer ein konkretes Projekt beschreibt:
+- Erstelle detaillierte Angebote nach der normalen Antwort
+- Verwende das folgende Format am ENDE deiner Antwort:
+
+---QUOTES---
+[QUOTE]{"service": "Konzeption & Wireframes", "description": "Erstellung von Wireframes und Konzept für die Website-Struktur", "estimatedHours": 16, "complexity": "mittel"}[/QUOTE]
+[QUOTE]{"service": "Design & Branding", "description": "Visuelles Design und Corporate Identity Entwicklung", "estimatedHours": 24, "complexity": "hoch"}[/QUOTE]
+[QUOTE]{"service": "Frontend-Entwicklung", "description": "Responsive Umsetzung der Website mit modernen Technologien", "estimatedHours": 40, "complexity": "hoch"}[/QUOTE]
+---END-QUOTES---
 
 Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"
 
-WICHTIG: Verwende die Quote-Empfehlungen auch bei kleineren Projekten oder Nachfragen!`;
+WICHTIG: 
+- Die QUOTES Sektion kommt NUR am Ende, NACH der normalen Antwort
+- Verwende NIEMALS [QUOTE_RECOMMENDATION] oder ähnliche Marker im normalen Text
+- Jedes Angebot MUSS mehrere Positionen haben`;
 
     const fullMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -104,38 +111,46 @@ WICHTIG: Verwende die Quote-Empfehlungen auch bei kleineren Projekten oder Nachf
             if (done) {
               console.log('Stream completed. Full response length:', fullResponse.length);
               
-              // Process quote recommendations at the end
-              const quoteMatches = fullResponse.match(/\[QUOTE_RECOMMENDATION\]\s*({[^}]*})\s*\[\/QUOTE_RECOMMENDATION\]/g);
+              // Process quotes from the dedicated section at the end
+              const quotesMatch = fullResponse.match(/---QUOTES---([\s\S]*?)---END-QUOTES---/);
               
-              if (quoteMatches && quoteMatches.length > 0) {
-                console.log('Found', quoteMatches.length, 'quote recommendations to process');
+              if (quotesMatch && quotesMatch[1]) {
+                console.log('Found quotes section, processing...');
+                const quotesSection = quotesMatch[1];
+                const quoteMatches = quotesSection.match(/\[QUOTE\]\s*({[^}]*})\s*\[\/QUOTE\]/g);
                 
-                for (const match of quoteMatches) {
-                  try {
-                    const jsonMatch = match.match(/\[QUOTE_RECOMMENDATION\]\s*({.*?})\s*\[\/QUOTE_RECOMMENDATION\]/);
-                    if (jsonMatch && jsonMatch[1]) {
-                      const jsonStr = jsonMatch[1];
-                      console.log('Attempting to parse quote JSON:', jsonStr);
-                      
-                      const quoteRecommendation = JSON.parse(jsonStr);
-                      console.log('Successfully parsed quote recommendation:', quoteRecommendation);
-                      
-                      if (quoteRecommendation.service && quoteRecommendation.description) {
-                        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                          type: 'quote_recommendation',
-                          data: quoteRecommendation
-                        })}\n\n`));
-                        console.log('Quote recommendation sent successfully');
-                      } else {
-                        console.warn('Quote recommendation missing required fields:', quoteRecommendation);
+                if (quoteMatches && quoteMatches.length > 0) {
+                  console.log('Found', quoteMatches.length, 'quotes to process');
+                  
+                  for (const match of quoteMatches) {
+                    try {
+                      const jsonMatch = match.match(/\[QUOTE\]\s*({.*?})\s*\[\/QUOTE\]/);
+                      if (jsonMatch && jsonMatch[1]) {
+                        const jsonStr = jsonMatch[1];
+                        console.log('Attempting to parse quote JSON:', jsonStr);
+                        
+                        const quoteRecommendation = JSON.parse(jsonStr);
+                        console.log('Successfully parsed quote recommendation:', quoteRecommendation);
+                        
+                        if (quoteRecommendation.service && quoteRecommendation.description) {
+                          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                            type: 'quote_recommendation',
+                            data: quoteRecommendation
+                          })}\n\n`));
+                          console.log('Quote recommendation sent successfully');
+                        } else {
+                          console.warn('Quote recommendation missing required fields:', quoteRecommendation);
+                        }
                       }
+                    } catch (e) {
+                      console.error('Failed to parse quote recommendation:', e, 'Raw match:', match);
                     }
-                  } catch (e) {
-                    console.error('Failed to parse quote recommendation:', e, 'Raw match:', match);
                   }
+                } else {
+                  console.log('No valid quotes found in quotes section');
                 }
               } else {
-                console.log('No quote recommendations found in response');
+                console.log('No quotes section found in response');
               }
               
               controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
@@ -163,20 +178,20 @@ WICHTIG: Verwende die Quote-Empfehlungen auch bei kleineren Projekten oder Nachf
                     if (content) {
                       fullResponse += content;
                       
-                      // Komplett filtern: Alle Quote-bezogenen Inhalte aus dem Stream entfernen
+                      // Clean streaming content - remove quotes section completely from display
                       let cleanContent = content;
                       
-                      // Entferne komplette Quote-Blöcke
-                      cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/gs, '');
+                      // Remove the entire quotes section from streaming display
+                      cleanContent = cleanContent.replace(/---QUOTES---[\s\S]*?---END-QUOTES---/g, '');
                       
-                      // Entferne einzelne Quote-Marker
-                      cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
-                      cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
+                      // Remove any partial quote markers that might appear during streaming
+                      cleanContent = cleanContent.replace(/---QUOTES---.*$/g, '');
+                      cleanContent = cleanContent.replace(/\[QUOTE\].*?\[\/QUOTE\]/g, '');
+                      cleanContent = cleanContent.replace(/\[QUOTE\]/g, '');
+                      cleanContent = cleanContent.replace(/\[\/QUOTE\]/g, '');
+                      cleanContent = cleanContent.replace(/---END-QUOTES---/g, '');
                       
-                      // Entferne auch partielle JSON-Strukturen die zu Quotes gehören
-                      cleanContent = cleanContent.replace(/\{"service":[^}]*\}/g, '');
-                      
-                      // Nur senden wenn nach der Filterung noch Inhalt vorhanden ist
+                      // Only send if there's content after filtering
                       if (cleanContent.trim()) {
                         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                           type: 'content',
