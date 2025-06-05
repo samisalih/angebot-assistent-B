@@ -303,7 +303,7 @@ export function BookingModal({ isOpen, onClose, currentQuoteItems = [] }: Bookin
                       <SelectValue placeholder="Angebot auswählen" />
                     </div>
                   </SelectTrigger>
-                  <SelectContent className="bg-white z-[100] max-h-[300px] overflow-y-auto">
+                  <SelectContent className="bg-white z-[100] max-h-[300px] min-w-[400px] overflow-y-auto">
                     {allQuotes.length === 0 ? (
                       <SelectItem value="no-quotes" disabled>
                         Keine Angebote verfügbar
