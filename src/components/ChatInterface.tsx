@@ -166,33 +166,48 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 const parsed = JSON.parse(data);
                 
                 if (parsed.type === 'content') {
-                  accumulatedText += parsed.data;
+                  // Content ohne Quote-Marker hinzufügen
+                  let cleanContent = parsed.data;
+                  cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
+                  cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
+                  cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
                   
-                  setMessages(prev => prev.map(msg => 
-                    msg.id === streamingMessageId 
-                      ? { ...msg, text: accumulatedText }
-                      : msg
-                  ));
+                  if (cleanContent.trim()) {
+                    accumulatedText += cleanContent;
+                    
+                    setMessages(prev => prev.map(msg => 
+                      msg.id === streamingMessageId 
+                        ? { ...msg, text: accumulatedText }
+                        : msg
+                    ));
+                  }
                 } else if (parsed.type === 'quote_recommendation') {
-                  console.log('Received quote recommendation:', parsed.data);
+                  console.log('Processing quote recommendation:', parsed.data);
                   
-                  // Sofort Quote-Item hinzufügen
                   const recommendation = parsed.data;
-                  const price = recommendation.estimatedHours && recommendation.complexity 
-                    ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
-                    : 0;
                   
-                  const quoteItem = {
-                    service: recommendation.service || 'Beratungsleistung',
-                    description: recommendation.description || 'Detaillierte Beschreibung folgt',
-                    estimatedHours: recommendation.estimatedHours || 0,
-                    complexity: recommendation.complexity || 'mittel',
-                    price: price,
-                    id: Date.now() + Math.random()
-                  };
-                  
-                  console.log('Adding quote item:', quoteItem);
-                  onAddQuoteItem(quoteItem);
+                  // Validierung der Recommendation-Daten
+                  if (recommendation && recommendation.service) {
+                    const price = recommendation.estimatedHours && recommendation.complexity 
+                      ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
+                      : 0;
+                    
+                    const quoteItem = {
+                      service: recommendation.service,
+                      description: recommendation.description || 'Detaillierte Beschreibung folgt',
+                      estimatedHours: recommendation.estimatedHours || 0,
+                      complexity: recommendation.complexity || 'mittel',
+                      price: price,
+                      id: Date.now() + Math.random()
+                    };
+                    
+                    console.log('Adding quote item to panel:', quoteItem);
+                    
+                    // Sofort hinzufügen ohne Verzögerung
+                    onAddQuoteItem(quoteItem);
+                  } else {
+                    console.warn('Invalid quote recommendation received:', recommendation);
+                  }
                 }
               } catch (e) {
                 console.warn('Failed to parse streaming data:', e, 'Raw data:', data);

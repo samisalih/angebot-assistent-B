@@ -51,9 +51,9 @@ ANGEBOTSERSTELLUNG - nur wenn ALLE Kriterien erfüllt:
 
 Erstelle DETAILLIERTE Angebote mit MEHREREN Positionen:
 
-[QUOTE_RECOMMENDATION]{"service": "Konzeption & Wireframes", "description": "Erstellung von Wireframes und Konzept", "estimatedHours": 16, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
-[QUOTE_RECOMMENDATION]{"service": "Design & Branding", "description": "Visuelles Design und Corporate Identity", "estimatedHours": 24, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
-[QUOTE_RECOMMENDATION]{"service": "Frontend-Entwicklung", "description": "Responsive Umsetzung", "estimatedHours": 40, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
+[QUOTE_RECOMMENDATION]{"service": "Konzeption & Wireframes", "description": "Erstellung von Wireframes und Konzept für die Website-Struktur", "estimatedHours": 16, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
+[QUOTE_RECOMMENDATION]{"service": "Design & Branding", "description": "Visuelles Design und Corporate Identity Entwicklung", "estimatedHours": 24, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
+[QUOTE_RECOMMENDATION]{"service": "Frontend-Entwicklung", "description": "Responsive Umsetzung der Website mit modernen Technologien", "estimatedHours": 40, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
 
 Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
 
@@ -107,22 +107,24 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
               // Process quote recommendations at the end
               const quoteMatches = fullResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/g);
               if (quoteMatches) {
-                console.log('Processing', quoteMatches.length, 'quote recommendations');
+                console.log('Found', quoteMatches.length, 'quote recommendations to process');
                 
                 for (const match of quoteMatches) {
                   try {
                     const jsonStr = match.replace(/\[QUOTE_RECOMMENDATION\]/, '').replace(/\[\/QUOTE_RECOMMENDATION\]/, '');
                     const quoteRecommendation = JSON.parse(jsonStr);
-                    console.log('Quote recommendation:', quoteRecommendation);
+                    console.log('Sending quote recommendation:', quoteRecommendation);
                     
                     controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                       type: 'quote_recommendation',
                       data: quoteRecommendation
                     })}\n\n`));
                   } catch (e) {
-                    console.error('Failed to parse quote recommendation:', e);
+                    console.error('Failed to parse quote recommendation:', e, 'Raw match:', match);
                   }
                 }
+              } else {
+                console.log('No quote recommendations found in response');
               }
               
               controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
@@ -150,7 +152,7 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
                     if (content) {
                       fullResponse += content;
                       
-                      // Clean content for display
+                      // Clean content for display (remove quote markers from streaming text)
                       let cleanContent = content;
                       cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
                       cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
