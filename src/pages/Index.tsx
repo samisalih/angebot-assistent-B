@@ -6,7 +6,7 @@ import { QuotePanel } from '@/components/QuotePanel';
 import { Header } from '@/components/Header';
 import { BookingModal } from '@/components/BookingModal';
 import { AppSidebar } from '@/components/AppSidebar';
-import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuotes } from '@/hooks/useQuotes';
 
@@ -75,18 +75,15 @@ const Index = () => {
           
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="container mx-auto px-4 py-3 flex-shrink-0">
-              <div className="flex items-center gap-4 mb-4">
-                <SidebarTrigger />
-                <div className="text-center flex-1">
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-digitalwert-primary via-digitalwert-primary-light to-digitalwert-accent-light bg-clip-text text-transparent mb-2">
-                    Digitalwert - KI-Beratung
-                  </h1>
-                  <p className="text-lg text-slate-300 max-w-3xl mx-auto">
-                    Lassen Sie sich von unserer KI zu Webauftritten, Rebrandings, UI Design und 
-                    technischer Realisierung von Shop-Websites beraten. Erhalten Sie sofort ein 
-                    detailliertes Angebot.
-                  </p>
-                </div>
+              <div className="text-center">
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-digitalwert-primary via-digitalwert-primary-light to-digitalwert-accent-light bg-clip-text text-transparent mb-2">
+                  Digitalwert - KI-Beratung
+                </h1>
+                <p className="text-lg text-slate-300 max-w-3xl mx-auto">
+                  Lassen Sie sich von unserer KI zu Webauftritten, Rebrandings, UI Design und 
+                  technischer Realisierung von Shop-Websites beraten. Erhalten Sie sofort ein 
+                  detailliertes Angebot.
+                </p>
               </div>
             </div>
 
