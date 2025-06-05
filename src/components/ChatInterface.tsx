@@ -23,13 +23,27 @@ const sanitizeInput = (input: string): string => {
   return input
     .trim()
     .replace(/[<>\"'&]/g, '') // Remove potentially dangerous characters
-    .substring(0, 1000); // Limit length to prevent abuse
+    .substring(0, 2000); // Increased length limit
 };
 
 // Rate limiting configuration
 const RATE_LIMIT = {
   maxMessages: 10,
   timeWindow: 60000, // 1 minute
+};
+
+// Markdown-to-JSX renderer for basic formatting
+const renderMarkdown = (text: string) => {
+  // Convert **bold** to JSX
+  const boldRegex = /\*\*(.*?)\*\*/g;
+  const parts = text.split(boldRegex);
+  
+  return parts.map((part, index) => {
+    if (index % 2 === 1) {
+      return <strong key={index} className="font-semibold">{part}</strong>;
+    }
+    return part;
+  });
 };
 
 export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
@@ -186,7 +200,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
       <CardHeader className="flex-shrink-0">
         <CardTitle className="flex items-center gap-2 text-white">
           <Bot className="w-5 h-5 text-digitalwert-primary" />
-          KI-Berater Chat (ChatGPT-Integration)
+          KI-Berater Chat
           {isRateLimited && (
             <AlertTriangle className="w-4 h-4 text-yellow-500" />
           )}
@@ -201,7 +215,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
               >
                 <div
-                  className={`max-w-[80%] p-3 rounded-lg ${
+                  className={`max-w-[85%] p-3 rounded-lg ${
                     message.isBot
                       ? 'bg-digitalwert-background-lighter border border-digitalwert-primary/20 text-slate-200'
                       : 'bg-gradient-to-b from-digitalwert-primary-light to-digitalwert-primary text-white'
@@ -214,8 +228,10 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                       <User className="w-4 h-4 mt-1 flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="whitespace-pre-line break-words">{message.text}</p>
-                      <p className="text-xs opacity-70 mt-1">
+                      <div className="whitespace-pre-line break-words leading-relaxed">
+                        {message.isBot ? renderMarkdown(message.text) : message.text}
+                      </div>
+                      <p className="text-xs opacity-70 mt-2">
                         {message.timestamp.toLocaleTimeString()}
                       </p>
                     </div>
@@ -245,7 +261,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
             placeholder="Beschreiben Sie Ihr Projekt..."
             className="flex-1 bg-digitalwert-background-lighter border-digitalwert-background-lighter text-white placeholder:text-slate-400"
             disabled={isTyping || isRateLimited}
-            maxLength={1000}
+            maxLength={2000}
           />
           <Button 
             onClick={handleSend} 
