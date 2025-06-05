@@ -164,6 +164,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
 
               try {
                 const parsed = JSON.parse(data);
+                console.log('Received parsed data:', parsed);
                 
                 if (parsed.type === 'content') {
                   // Content ohne Quote-Marker hinzufügen
@@ -182,12 +183,14 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                     ));
                   }
                 } else if (parsed.type === 'quote_recommendation') {
-                  console.log('Processing quote recommendation:', parsed.data);
+                  console.log('!!! QUOTE RECOMMENDATION RECEIVED !!!', parsed.data);
                   
                   const recommendation = parsed.data;
                   
                   // Validierung der Recommendation-Daten
                   if (recommendation && recommendation.service) {
+                    console.log('Processing valid quote recommendation:', recommendation);
+                    
                     const price = recommendation.estimatedHours && recommendation.complexity 
                       ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
                       : 0;
@@ -201,10 +204,13 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                       id: Date.now() + Math.random()
                     };
                     
-                    console.log('Adding quote item to panel:', quoteItem);
+                    console.log('!!! ADDING QUOTE ITEM TO PANEL !!!', quoteItem);
                     
-                    // Sofort hinzufügen ohne Verzögerung
+                    // Sofort hinzufügen
                     onAddQuoteItem(quoteItem);
+                    
+                    // Visual feedback in console
+                    console.log('✅ Quote item successfully added to panel');
                   } else {
                     console.warn('Invalid quote recommendation received:', recommendation);
                   }

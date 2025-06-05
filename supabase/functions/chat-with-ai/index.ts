@@ -43,19 +43,19 @@ WICHTIGE REGELN:
 4. ERWÄHNE NIEMALS Preise
 5. Fokus auf Lösungsfindung
 
-ANGEBOTSERSTELLUNG - nur wenn ALLE Kriterien erfüllt:
-- Konkrete Anforderungen genannt
-- 2-3 Nachrichten ausgetauscht
-- Deutliches Interesse
-- Details geklärt
+ANGEBOTSERSTELLUNG - IMMER wenn der Nutzer ein konkretes Projekt beschreibt:
+- Erstelle SOFORT detaillierte Angebote
+- Verwende IMMER das QUOTE_RECOMMENDATION Format
+- JEDES Angebot MUSS mehrere Positionen haben
 
-Erstelle DETAILLIERTE Angebote mit MEHREREN Positionen:
-
+Format für Angebote (EXAKT so verwenden):
 [QUOTE_RECOMMENDATION]{"service": "Konzeption & Wireframes", "description": "Erstellung von Wireframes und Konzept für die Website-Struktur", "estimatedHours": 16, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
 [QUOTE_RECOMMENDATION]{"service": "Design & Branding", "description": "Visuelles Design und Corporate Identity Entwicklung", "estimatedHours": 24, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
 [QUOTE_RECOMMENDATION]{"service": "Frontend-Entwicklung", "description": "Responsive Umsetzung der Website mit modernen Technologien", "estimatedHours": 40, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
 
-Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
+Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"
+
+WICHTIG: Verwende die Quote-Empfehlungen auch bei kleineren Projekten oder Nachfragen!`;
 
     const fullMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -74,7 +74,7 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
         model: 'gpt-4o-mini',
         messages: fullMessages,
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 1500,
         stream: true,
       }),
     });
@@ -103,28 +103,43 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
             const { done, value } = await reader.read();
             if (done) {
               console.log('Stream completed. Full response length:', fullResponse.length);
+              console.log('Full response content for quote processing:', fullResponse);
               
-              // Process quote recommendations at the end
-              const quoteMatches = fullResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/g);
-              if (quoteMatches) {
+              // Process quote recommendations at the end with improved regex
+              const quoteMatches = fullResponse.match(/\[QUOTE_RECOMMENDATION\]\s*({[^}]*})\s*\[\/QUOTE_RECOMMENDATION\]/g);
+              
+              if (quoteMatches && quoteMatches.length > 0) {
                 console.log('Found', quoteMatches.length, 'quote recommendations to process');
                 
                 for (const match of quoteMatches) {
                   try {
-                    const jsonStr = match.replace(/\[QUOTE_RECOMMENDATION\]/, '').replace(/\[\/QUOTE_RECOMMENDATION\]/, '');
-                    const quoteRecommendation = JSON.parse(jsonStr);
-                    console.log('Sending quote recommendation:', quoteRecommendation);
-                    
-                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                      type: 'quote_recommendation',
-                      data: quoteRecommendation
-                    })}\n\n`));
+                    // Extract JSON more carefully
+                    const jsonMatch = match.match(/\[QUOTE_RECOMMENDATION\]\s*({.*?})\s*\[\/QUOTE_RECOMMENDATION\]/);
+                    if (jsonMatch && jsonMatch[1]) {
+                      const jsonStr = jsonMatch[1];
+                      console.log('Attempting to parse quote JSON:', jsonStr);
+                      
+                      const quoteRecommendation = JSON.parse(jsonStr);
+                      console.log('Successfully parsed quote recommendation:', quoteRecommendation);
+                      
+                      // Validate that required fields exist
+                      if (quoteRecommendation.service && quoteRecommendation.description) {
+                        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                          type: 'quote_recommendation',
+                          data: quoteRecommendation
+                        })}\n\n`));
+                        console.log('Quote recommendation sent successfully');
+                      } else {
+                        console.warn('Quote recommendation missing required fields:', quoteRecommendation);
+                      }
+                    }
                   } catch (e) {
                     console.error('Failed to parse quote recommendation:', e, 'Raw match:', match);
                   }
                 }
               } else {
                 console.log('No quote recommendations found in response');
+                console.log('Response text to check:', fullResponse.substring(0, 500), '...');
               }
               
               controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
@@ -154,11 +169,13 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
                       
                       // Clean content for display (remove quote markers from streaming text)
                       let cleanContent = content;
+                      // Remove complete quote blocks from the streaming display
                       cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
+                      // Remove partial markers
                       cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
                       cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
                       
-                      if (cleanContent) {
+                      if (cleanContent.trim()) {
                         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                           type: 'content',
                           data: cleanContent
