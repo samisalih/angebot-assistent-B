@@ -1,9 +1,11 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, AlertTriangle } from 'lucide-react';
+import { Send, Bot, User, AlertTriangle, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: number;
@@ -70,71 +72,52 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
     return true;
   };
 
-  const getAIResponse = (userMessage: string) => {
-    // Sanitize the user message before processing
-    const sanitizedMessage = sanitizeInput(userMessage);
-    const message = sanitizedMessage.toLowerCase();
-    
-    if (message.includes('website') || message.includes('webauftritt')) {
-      setTimeout(() => {
-        onAddQuoteItem({
-          service: 'Professioneller Webauftritt',
-          description: 'Responsive Website mit modernem Design',
-          price: 2500
-        });
-      }, 1000);
+  const getAIResponse = async (userMessage: string) => {
+    try {
+      // Bereite die Nachrichtenhistorie für die KI vor
+      const chatHistory = messages.map(msg => ({
+        role: msg.isBot ? 'assistant' : 'user',
+        content: msg.text
+      }));
       
-      return "Gerne erstelle ich Ihnen ein Angebot für einen professionellen Webauftritt. Basierend auf Ihren Anforderungen schlage ich eine responsive Website mit modernem Design vor. Benötigen Sie zusätzliche Funktionen wie einen Online-Shop, ein Content-Management-System oder spezielle Integrationen?";
-    }
-    
-    if (message.includes('shop') || message.includes('e-commerce')) {
-      setTimeout(() => {
-        onAddQuoteItem({
-          service: 'E-Commerce Shop-System',
-          description: 'Vollständiges Online-Shop System mit Zahlungsabwicklung',
-          price: 4500
-        });
-      }, 1000);
-      
-      return "Für einen E-Commerce Shop empfehle ich ein vollständiges System mit Produktkatalog, Warenkorb, Zahlungsabwicklung und Bestellverwaltung. Das Angebot wurde zu Ihrem Kostenvoranschlag hinzugefügt. Wie viele Produkte sollen ungefähr verkauft werden?";
-    }
-    
-    if (message.includes('rebranding') || message.includes('design')) {
-      setTimeout(() => {
-        onAddQuoteItem({
-          service: 'Corporate Rebranding',
-          description: 'Komplettes Rebranding inkl. Logo, Farben und Styleguide',
-          price: 3200
-        });
-      }, 1000);
-      
-      return "Ein Rebranding ist eine ausgezeichnete Investition in die Zukunft Ihres Unternehmens. Ich habe ein Paket für ein komplettes Corporate Rebranding zu Ihrem Angebot hinzugefügt. Dies umfasst Logo-Design, Farbpalette, Typografie und einen umfassenden Styleguide. Haben Sie bereits konkrete Vorstellungen für die neue Markenrichtung?";
-    }
-    
-    if (message.includes('ui') || message.includes('interface')) {
-      setTimeout(() => {
-        onAddQuoteItem({
-          service: 'UI/UX Design',
-          description: 'Benutzerfreundliches Interface Design',
-          price: 1800
-        });
-      }, 1000);
-      
-      return "UI/UX Design ist entscheidend für den Erfolg digitaler Produkte. Ich habe ein Angebot für professionelles Interface Design hinzugefügt. Dies umfasst Wireframes, Prototyping und das finale Design. Für welche Art von Anwendung benötigen Sie das Design?";
-    }
-    
-    if (message.includes('beratung') || message.includes('hilfe')) {
-      return "Gerne berate ich Sie umfassend! Ich kann Ihnen bei folgenden Bereichen helfen: \n\n• Webauftritte und Corporate Websites\n• E-Commerce und Online-Shops\n• Rebranding und Corporate Design\n• UI/UX Design für digitale Produkte\n• Technische Realisierung und Entwicklung\n\nWas interessiert Sie am meisten?";
-    }
+      // Füge die neue Benutzernachricht hinzu
+      chatHistory.push({
+        role: 'user',
+        content: userMessage
+      });
 
-    if (message.includes('preis') || message.includes('kosten')) {
-      return "Unsere Preise sind transparent und fair kalkuliert. Sie sehen alle Positionen live in Ihrem Kostenvoranschlag rechts. Jedes Projekt wird individuell bewertet - sprechen Sie einfach Ihre konkreten Anforderungen an, dann kann ich Ihnen passende Angebote erstellen.";
-    }
+      console.log('Sending chat request to AI...');
+      
+      const { data, error } = await supabase.functions.invoke('chat-with-ai', {
+        body: { messages: chatHistory }
+      });
 
-    return "Das ist eine interessante Anfrage! Können Sie mir mehr Details dazu geben? Je spezifischer Sie Ihre Wünsche beschreiben, desto besser kann ich Ihnen passende Lösungen und Angebote erstellen. Geht es um einen Webauftritt, E-Commerce, Design oder etwas anderes?";
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      console.log('AI response received:', data);
+
+      // Prüfe auf Quote-Empfehlung
+      if (data.quoteRecommendation) {
+        console.log('Adding quote recommendation:', data.quoteRecommendation);
+        setTimeout(() => {
+          onAddQuoteItem({
+            ...data.quoteRecommendation,
+            id: Date.now()
+          });
+        }, 1000);
+      }
+
+      return data.response || 'Entschuldigung, ich konnte keine passende Antwort generieren.';
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      return 'Entschuldigung, es gab einen technischen Fehler. Bitte versuchen Sie es erneut.';
+    }
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const sanitizedInput = sanitizeInput(input);
     
     if (!sanitizedInput.trim()) return;
@@ -161,16 +144,29 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
+    try {
+      const aiResponse = await getAIResponse(sanitizedInput);
+      
       const botResponse: Message = {
         id: Date.now() + 1,
-        text: getAIResponse(sanitizedInput),
+        text: aiResponse,
         isBot: true,
         timestamp: new Date()
       };
+      
       setMessages(prev => [...prev, botResponse]);
+    } catch (error) {
+      console.error('Error in handleSend:', error);
+      const errorResponse: Message = {
+        id: Date.now() + 1,
+        text: 'Entschuldigung, es gab einen Fehler bei der Verarbeitung Ihrer Anfrage.',
+        isBot: true,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorResponse]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -190,7 +186,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
       <CardHeader className="flex-shrink-0">
         <CardTitle className="flex items-center gap-2 text-white">
           <Bot className="w-5 h-5 text-digitalwert-primary" />
-          KI-Berater Chat
+          KI-Berater Chat (ChatGPT-Integration)
           {isRateLimited && (
             <AlertTriangle className="w-4 h-4 text-yellow-500" />
           )}
@@ -232,11 +228,8 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 <div className="bg-digitalwert-background-lighter border border-digitalwert-primary/20 p-3 rounded-lg">
                   <div className="flex items-center gap-2">
                     <Bot className="w-4 h-4 text-digitalwert-primary" />
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-digitalwert-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
+                    <Loader2 className="w-4 h-4 text-digitalwert-primary animate-spin" />
+                    <span className="text-slate-300 text-sm">KI denkt nach...</span>
                   </div>
                 </div>
               </div>
@@ -258,7 +251,11 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
             onClick={handleSend} 
             disabled={isTyping || isRateLimited || !input.trim()}
           >
-            <Send className="w-4 h-4" />
+            {isTyping ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </Button>
         </div>
         {isRateLimited && (
