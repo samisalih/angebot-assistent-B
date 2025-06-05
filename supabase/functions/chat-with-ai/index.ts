@@ -68,28 +68,34 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
         model: 'gpt-4o-mini',
         messages: fullMessages,
         temperature: 0.7,
-        max_tokens: 500, // Reduziert für kürzere Antworten
+        max_tokens: 800,
         stream: true,
       }),
     });
 
     if (!response.ok) {
+      console.error('OpenAI API error:', response.status, await response.text());
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    // Verbesserte Stream-Verarbeitung
     const stream = new ReadableStream({
       async start(controller) {
         const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body reader available');
+        }
+
         const decoder = new TextDecoder();
         let buffer = '';
         let fullResponse = '';
-        let processedChunks = new Set(); // Verhindert Duplikate
 
         try {
           while (true) {
-            const { done, value } = await reader!.read();
-            if (done) break;
+            const { done, value } = await reader.read();
+            if (done) {
+              console.log('Stream finished, full response length:', fullResponse.length);
+              break;
+            }
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
@@ -97,18 +103,19 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
 
             for (const line of lines) {
               if (line.startsWith('data: ')) {
-                const data = line.slice(6);
+                const data = line.slice(6).trim();
+                
                 if (data === '[DONE]') {
-                  // Quote-Empfehlungen verarbeiten
+                  // Verarbeite Quote-Empfehlungen am Ende
                   const quoteMatches = fullResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/g);
                   if (quoteMatches) {
-                    console.log('Found', quoteMatches.length, 'quote recommendations');
+                    console.log('Processing', quoteMatches.length, 'quote recommendations');
                     
                     for (const match of quoteMatches) {
                       try {
                         const jsonStr = match.replace(/\[QUOTE_RECOMMENDATION\]/, '').replace(/\[\/QUOTE_RECOMMENDATION\]/, '');
                         const quoteRecommendation = JSON.parse(jsonStr);
-                        console.log('Quote recommendation extracted:', quoteRecommendation);
+                        console.log('Quote recommendation:', quoteRecommendation);
                         
                         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                           type: 'quote_recommendation',
@@ -125,41 +132,37 @@ Komplexität: "niedrig", "mittel", "hoch", "sehr hoch"`;
                   return;
                 }
 
-                try {
-                  const parsed = JSON.parse(data);
-                  const content = parsed.choices?.[0]?.delta?.content;
-                  if (content) {
-                    // Duplikate-Check
-                    const chunkId = parsed.id + '_' + (parsed.choices?.[0]?.index || 0);
-                    if (processedChunks.has(chunkId)) {
-                      continue;
-                    }
-                    processedChunks.add(chunkId);
-
-                    fullResponse += content;
+                if (data) {
+                  try {
+                    const parsed = JSON.parse(data);
+                    const content = parsed.choices?.[0]?.delta?.content;
                     
-                    // Quote-Tags entfernen
-                    let cleanContent = content;
-                    cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
-                    cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
-                    cleanContent = cleanContent.replace(/\[QUOTE_RECOMM[^]]*$/g, '');
-                    cleanContent = cleanContent.replace(/^[^]]*ENDATION\]/g, '');
-                    
-                    if (cleanContent) {
-                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                        type: 'content',
-                        data: cleanContent
-                      })}\n\n`));
+                    if (content) {
+                      fullResponse += content;
+                      
+                      // Entferne Quote-Tags für die Anzeige
+                      let cleanContent = content;
+                      cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
+                      cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
+                      cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
+                      
+                      // Sende nur sauberen Content
+                      if (cleanContent) {
+                        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                          type: 'content',
+                          data: cleanContent
+                        })}\n\n`));
+                      }
                     }
+                  } catch (e) {
+                    console.error('Failed to parse streaming data:', e, 'Data:', data);
                   }
-                } catch (e) {
-                  // Skip malformed JSON
                 }
               }
             }
           }
         } catch (error) {
-          console.error('Streaming error:', error);
+          console.error('Stream reading error:', error);
           controller.error(error);
         }
       }
