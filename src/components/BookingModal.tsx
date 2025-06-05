@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,12 +14,22 @@ import { useQuotes } from '@/hooks/useQuotes';
 import { supabase } from '@/integrations/supabase/client';
 import { createQuoteAccessToken } from '@/utils/tokenGenerator';
 
+interface QuoteItem {
+  id: number;
+  service: string;
+  description: string;
+  price: number;
+  estimatedHours?: number;
+  complexity?: string;
+}
+
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
+  currentQuoteItems?: QuoteItem[];
 }
 
-export function BookingModal({ isOpen, onClose }: BookingModalProps) {
+export function BookingModal({ isOpen, onClose, currentQuoteItems = [] }: BookingModalProps) {
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState('');
   const [selectedQuoteId, setSelectedQuoteId] = useState('');
@@ -36,7 +47,23 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
     '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'
   ];
 
-  const selectedQuote = quotes.find(quote => quote.id === selectedQuoteId);
+  // Combine saved quotes with current quote items
+  const allQuotes = [
+    // Current quote items (if any)
+    ...(currentQuoteItems.length > 0 ? [{
+      id: 'current',
+      title: 'Aktuelles Angebot',
+      quote_number: `TEMP-${Date.now().toString().slice(-6)}`,
+      total_amount: currentQuoteItems.reduce((sum, item) => sum + (item.price || 0), 0),
+      status: 'draft' as const,
+      items: currentQuoteItems,
+      created_at: new Date().toISOString()
+    }] : []),
+    // Saved quotes
+    ...quotes
+  ];
+
+  const selectedQuote = allQuotes.find(quote => quote.id === selectedQuoteId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +89,31 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setIsSubmitting(true);
 
     try {
+      let quoteIdForBooking = selectedQuoteId;
+      let accessToken = null;
+
+      // If it's the current quote (not saved yet), save it first
+      if (selectedQuoteId === 'current' && selectedQuote) {
+        // Save the current quote first
+        const { saveQuote } = useQuotes();
+        const savedQuote = await saveQuote(currentQuoteItems, selectedQuote.title);
+        
+        if (savedQuote) {
+          quoteIdForBooking = savedQuote.id;
+          accessToken = await createQuoteAccessToken(savedQuote.id);
+        } else {
+          toast({
+            title: "Fehler",
+            description: "Angebot konnte nicht gespeichert werden.",
+            variant: "destructive"
+          });
+          return;
+        }
+      } else {
+        // Generate access token for existing quote
+        accessToken = await createQuoteAccessToken(selectedQuoteId);
+      }
+
       // Insert booking into database
       const { data: bookingData, error } = await supabase
         .from('bookings')
@@ -70,7 +122,7 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
           name: formData.name,
           email: formData.email,
           phone: formData.phone || null,
-          quote_id: selectedQuoteId,
+          quote_id: quoteIdForBooking,
           preferred_date: selectedDate.toISOString().split('T')[0],
           preferred_time: selectedTime,
           status: 'pending'
@@ -88,15 +140,7 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
         return;
       }
 
-      // Generate access token for the quote
-      const accessToken = await createQuoteAccessToken(selectedQuoteId);
-      
-      if (!accessToken) {
-        console.error('Failed to create access token');
-        // Continue without token - booking is still valid
-      }
-
-      // Prepare data for email sending that matches the edge function validation
+      // Prepare data for email sending
       const emailData = {
         customerName: formData.name,
         customerEmail: formData.email,
@@ -111,7 +155,6 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
           description: `Angebot ${selectedQuote.quote_number}`,
           price: selectedQuote.total_amount
         }] : [],
-        // Add the access token for the admin email
         quoteAccessToken: accessToken
       };
 
@@ -127,7 +170,6 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
         if (emailError) {
           console.error('Error sending email:', emailError);
-          // Don't fail the booking if email fails, just log it
           toast({
             title: "Termin gebucht!",
             description: `Ihr Beratungstermin am ${selectedDate.toLocaleDateString('de-DE')} um ${selectedTime} Uhr wurde bestätigt. (E-Mail-Versand fehlgeschlagen)`,
@@ -273,17 +315,21 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     </div>
                   </SelectTrigger>
                   <SelectContent className="bg-white z-50">
-                    {quotes.length === 0 ? (
+                    {allQuotes.length === 0 ? (
                       <SelectItem value="no-quotes" disabled>
                         Keine Angebote verfügbar
                       </SelectItem>
                     ) : (
-                      quotes.map((quote) => (
+                      allQuotes.map((quote) => (
                         <SelectItem key={quote.id} value={quote.id!}>
                           <div className="flex flex-col">
-                            <span className="font-medium">{quote.title}</span>
+                            <span className="font-medium">
+                              {quote.id === 'current' ? '📝 ' : ''}
+                              {quote.title}
+                            </span>
                             <span className="text-sm text-slate-500">
                               #{quote.quote_number} - {Number(quote.total_amount).toLocaleString('de-DE')} €
+                              {quote.id === 'current' ? ' (wird beim Buchen gespeichert)' : ''}
                             </span>
                           </div>
                         </SelectItem>
@@ -306,6 +352,11 @@ export function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     <p className="text-sm text-blue-700">
                       <strong>Gesamtbetrag:</strong> {Number(selectedQuote.total_amount).toLocaleString('de-DE')} €
                     </p>
+                    {selectedQuote.id === 'current' && (
+                      <p className="text-xs text-blue-600 mt-2 italic">
+                        Dieses Angebot wird automatisch gespeichert, wenn Sie den Termin buchen.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               )}

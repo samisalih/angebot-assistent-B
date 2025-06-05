@@ -110,6 +110,7 @@ const Index = () => {
       <BookingModal 
         isOpen={isBookingOpen}
         onClose={() => setIsBookingOpen(false)}
+        currentQuoteItems={quoteItems}
       />
     </SidebarProvider>
   );
