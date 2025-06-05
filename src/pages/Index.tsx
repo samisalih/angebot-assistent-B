@@ -5,6 +5,8 @@ import { ChatInterface } from '@/components/ChatInterface';
 import { QuotePanel } from '@/components/QuotePanel';
 import { Header } from '@/components/Header';
 import { BookingModal } from '@/components/BookingModal';
+import { AppSidebar } from '@/components/AppSidebar';
+import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuotes } from '@/hooks/useQuotes';
 
@@ -60,51 +62,59 @@ const Index = () => {
   }
 
   return (
-    <div className="dark h-screen bg-gradient-to-br from-digitalwert-background via-digitalwert-background-light to-digitalwert-background-lighter flex flex-col overflow-hidden">
-      <Header 
-        user={user}
-        onLoginOpen={handleLoginOpen}
-        onAdminOpen={() => navigate('/dashboard')}
-        onLogout={handleLogout}
-      />
-      
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="container mx-auto px-4 py-3 flex-shrink-0">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-digitalwert-primary via-digitalwert-primary-light to-digitalwert-accent-light bg-clip-text text-transparent mb-2">
-              Digitalwert - KI-Beratung
-            </h1>
-            <p className="text-lg text-slate-300 max-w-3xl mx-auto">
-              Lassen Sie sich von unserer KI zu Webauftritten, Rebrandings, UI Design und 
-              technischer Realisierung von Shop-Websites beraten. Erhalten Sie sofort ein 
-              detailliertes Angebot.
-            </p>
-          </div>
-        </div>
+    <SidebarProvider>
+      <div className="dark min-h-screen bg-gradient-to-br from-digitalwert-background via-digitalwert-background-light to-digitalwert-background-lighter flex w-full">
+        <AppSidebar />
+        <SidebarInset className="flex-1 flex flex-col overflow-hidden">
+          <Header 
+            user={user}
+            onLoginOpen={handleLoginOpen}
+            onAdminOpen={() => navigate('/dashboard')}
+            onLogout={handleLogout}
+          />
+          
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="container mx-auto px-4 py-3 flex-shrink-0">
+              <div className="flex items-center gap-4 mb-4">
+                <SidebarTrigger />
+                <div className="text-center flex-1">
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-digitalwert-primary via-digitalwert-primary-light to-digitalwert-accent-light bg-clip-text text-transparent mb-2">
+                    Digitalwert - KI-Beratung
+                  </h1>
+                  <p className="text-lg text-slate-300 max-w-3xl mx-auto">
+                    Lassen Sie sich von unserer KI zu Webauftritten, Rebrandings, UI Design und 
+                    technischer Realisierung von Shop-Websites beraten. Erhalten Sie sofort ein 
+                    detailliertes Angebot.
+                  </p>
+                </div>
+              </div>
+            </div>
 
-        <div className="flex-1 container mx-auto px-4 pb-4 min-h-0 overflow-hidden">
-          <div className="grid lg:grid-cols-2 gap-6 h-full max-h-[calc(100vh-200px)]">
-            <div className="h-full max-h-full overflow-hidden">
-              <ChatInterface onAddQuoteItem={addQuoteItem} />
-            </div>
-            <div className="h-full max-h-full overflow-hidden">
-              <QuotePanel 
-                items={quoteItems}
-                onRemoveItem={removeQuoteItem}
-                onBooking={() => setIsBookingOpen(true)}
-                onSaveQuote={handleSaveQuote}
-                user={user}
-              />
+            <div className="flex-1 container mx-auto px-4 pb-4 min-h-0 overflow-hidden">
+              <div className="grid lg:grid-cols-2 gap-6 h-full max-h-[calc(100vh-200px)]">
+                <div className="h-full max-h-full overflow-hidden">
+                  <ChatInterface onAddQuoteItem={addQuoteItem} />
+                </div>
+                <div className="h-full max-h-full overflow-hidden">
+                  <QuotePanel 
+                    items={quoteItems}
+                    onRemoveItem={removeQuoteItem}
+                    onBooking={() => setIsBookingOpen(true)}
+                    onSaveQuote={handleSaveQuote}
+                    user={user}
+                  />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </SidebarInset>
       </div>
 
       <BookingModal 
         isOpen={isBookingOpen}
         onClose={() => setIsBookingOpen(false)}
       />
-    </div>
+    </SidebarProvider>
   );
 };
 
