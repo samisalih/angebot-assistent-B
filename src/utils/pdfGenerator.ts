@@ -8,8 +8,8 @@ export const generateQuotePDF = (quote: Quote) => {
   // Add Titillium Web font (we'll use a similar font that's available in jsPDF)
   doc.setFont('helvetica');
   
-  // Header with gradient-like background effect
-  doc.setFillColor(191, 22, 172); // digitalwert-primary color
+  // Header with gradient-like background effect using dark blue
+  doc.setFillColor(15, 25, 35); // digitalwert-background dark blue
   doc.rect(0, 0, 210, 35, 'F');
   
   // Company name in header
@@ -77,14 +77,14 @@ export const generateQuotePDF = (quote: Quote) => {
   doc.text('Leistungsübersicht', 20, yPosition);
   
   yPosition += 5;
-  doc.setDrawColor(191, 22, 172);
+  doc.setDrawColor(15, 25, 35); // Changed to dark blue
   doc.setLineWidth(2);
   doc.line(20, yPosition, 80, yPosition);
   
   yPosition += 15;
   
-  // Table header with background
-  doc.setFillColor(191, 22, 172);
+  // Table header with background using dark blue
+  doc.setFillColor(15, 25, 35); // Changed to dark blue
   doc.rect(15, yPosition - 8, 180, 12, 'F');
   
   doc.setFontSize(10);
