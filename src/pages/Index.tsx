@@ -61,7 +61,7 @@ const Index = () => {
   }
 
   return (
-    <div className="dark min-h-screen bg-gradient-to-br from-digitalwert-background via-digitalwert-background-light to-digitalwert-background-lighter flex flex-col">
+    <div className="dark h-screen bg-gradient-to-br from-digitalwert-background via-digitalwert-background-light to-digitalwert-background-lighter flex flex-col">
       <Header 
         user={user}
         onLoginOpen={handleLoginOpen}
@@ -69,13 +69,13 @@ const Index = () => {
         onLogout={handleLogout}
       />
       
-      <div className="flex-1 flex flex-col">
-        <div className="container mx-auto px-4 py-6 flex-shrink-0">
-          <div className="text-center mb-6">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-digitalwert-primary via-digitalwert-primary-light to-digitalwert-accent-light bg-clip-text text-transparent mb-4">
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="container mx-auto px-4 py-3 flex-shrink-0">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-digitalwert-primary via-digitalwert-primary-light to-digitalwert-accent-light bg-clip-text text-transparent mb-2">
               Digitalwert - KI-Beratung
             </h1>
-            <p className="text-xl text-slate-300 max-w-3xl mx-auto">
+            <p className="text-lg text-slate-300 max-w-3xl mx-auto">
               Lassen Sie sich von unserer KI zu Webauftritten, Rebrandings, UI Design und 
               technischer Realisierung von Shop-Websites beraten. Erhalten Sie sofort ein 
               detailliertes Angebot.
@@ -83,8 +83,8 @@ const Index = () => {
           </div>
         </div>
 
-        <div className="flex-1 container mx-auto px-4 pb-6">
-          <div className="grid lg:grid-cols-2 gap-8 h-full">
+        <div className="flex-1 container mx-auto px-4 pb-4 min-h-0">
+          <div className="grid lg:grid-cols-2 gap-6 h-full">
             <ChatInterface onAddQuoteItem={addQuoteItem} />
             <QuotePanel 
               items={quoteItems}
