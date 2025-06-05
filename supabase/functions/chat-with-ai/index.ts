@@ -29,7 +29,7 @@ serve(async (req) => {
 
     console.log('Chat request received with', messages.length, 'messages');
 
-    // Improved system prompt - less aggressive about creating quotes
+    // Verbesserter System-Prompt mit detaillierteren Angebotserstellungen
     const systemPrompt = `Du bist ein professioneller KI-Berater von Digitalwert, einem Unternehmen für digitale Lösungen. Du hilfst Kunden bei:
 
 - Webauftritten und Corporate Websites
@@ -51,12 +51,25 @@ ANGEBOTSERSTELLUNG - NUR WENN ALLE KRITERIEN ERFÜLLT SIND:
 - Der Kunde zeigt deutliches Interesse an einer Umsetzung
 - Alle wichtigen Details sind geklärt
 
-Wenn ALLE Kriterien erfüllt sind, gib eine JSON-Empfehlung am Ende deiner Antwort:
-[QUOTE_RECOMMENDATION]{"service": "Service Name", "description": "Detaillierte Beschreibung", "estimatedHours": 40, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
+WICHTIG: Erstelle DETAILLIERTE Angebote mit MEHREREN POSITIONEN. Teile große Projekte in sinnvolle Einzelleistungen auf:
+
+Beispiel für eine Website:
+- Konzeption und Wireframes
+- Design und Corporate Identity
+- Frontend-Entwicklung
+- Backend-Entwicklung
+- CMS-Integration
+- SEO-Optimierung
+- Testing und Launch
+
+Wenn ALLE Kriterien erfüllt sind, gib MEHRERE JSON-Empfehlungen am Ende deiner Antwort:
+[QUOTE_RECOMMENDATION]{"service": "Konzeption & Wireframes", "description": "Erstellung von Wireframes und technischem Konzept", "estimatedHours": 16, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
+[QUOTE_RECOMMENDATION]{"service": "Design & Corporate Identity", "description": "Visuelles Design und Branding-Elemente", "estimatedHours": 24, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
+[QUOTE_RECOMMENDATION]{"service": "Frontend-Entwicklung", "description": "Responsive Umsetzung mit modernen Technologien", "estimatedHours": 40, "complexity": "hoch"}[/QUOTE_RECOMMENDATION]
 
 Komplexitätsstufen: "niedrig", "mittel", "hoch", "sehr hoch"
 
-Analysiere die Konversation sorgfältig und erstelle nur dann ein Angebot, wenn der Kunde wirklich bereit ist.`;
+Analysiere die Konversation sorgfältig und erstelle nur dann Angebote, wenn der Kunde wirklich bereit ist.`;
 
     const fullMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -104,19 +117,24 @@ Analysiere die Konversation sorgfältig und erstelle nur dann ein Angebot, wenn 
                 const data = line.slice(6);
                 if (data === '[DONE]') {
                   // Process final response for quote recommendations
-                  const quoteMatch = fullResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/);
-                  if (quoteMatch) {
-                    try {
-                      const quoteRecommendation = JSON.parse(quoteMatch[1]);
-                      console.log('Quote recommendation extracted:', quoteRecommendation);
-                      
-                      // Send quote recommendation separately
-                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                        type: 'quote_recommendation',
-                        data: quoteRecommendation
-                      })}\n\n`));
-                    } catch (e) {
-                      console.error('Failed to parse quote recommendation:', e);
+                  const quoteMatches = fullResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/g);
+                  if (quoteMatches) {
+                    console.log('Found', quoteMatches.length, 'quote recommendations');
+                    
+                    for (const match of quoteMatches) {
+                      try {
+                        const jsonStr = match.replace(/\[QUOTE_RECOMMENDATION\]/, '').replace(/\[\/QUOTE_RECOMMENDATION\]/, '');
+                        const quoteRecommendation = JSON.parse(jsonStr);
+                        console.log('Quote recommendation extracted:', quoteRecommendation);
+                        
+                        // Send quote recommendation separately
+                        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                          type: 'quote_recommendation',
+                          data: quoteRecommendation
+                        })}\n\n`));
+                      } catch (e) {
+                        console.error('Failed to parse quote recommendation:', e);
+                      }
                     }
                   }
                   
@@ -131,10 +149,18 @@ Analysiere die Konversation sorgfältig und erstelle nur dann ein Angebot, wenn 
                   if (content) {
                     fullResponse += content;
                     
-                    // Stream content immediately, filtering out quote tags
-                    const cleanContent = content.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
+                    // Verbesserte Filterung: Entferne alle Quote-Tags vollständig
+                    let cleanContent = content;
                     
-                    // Always send content, even if empty after filtering
+                    // Entferne öffnende Tags
+                    cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
+                    // Entferne schließende Tags
+                    cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
+                    // Entferne auch partielle Tags die über Chunks verteilt sein könnten
+                    cleanContent = cleanContent.replace(/\[QUOTE_RECOMM[^]]*$/g, '');
+                    cleanContent = cleanContent.replace(/^[^]]*ENDATION\]/g, '');
+                    
+                    // Sende nur sauberen Content
                     controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                       type: 'content',
                       data: cleanContent

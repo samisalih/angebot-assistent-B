@@ -168,8 +168,15 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 const parsed = JSON.parse(data);
                 
                 if (parsed.type === 'content') {
-                  // Always accumulate content for real-time streaming
-                  accumulatedText += parsed.data;
+                  // Akkumuliere Content, aber filtere weiterhin Quote-Tags heraus
+                  let cleanContent = parsed.data;
+                  
+                  // Zusätzliche client-seitige Filterung für Sicherheit
+                  cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
+                  cleanContent = cleanContent.replace(/\[QUOTE_RECOMMENDATION\]/g, '');
+                  cleanContent = cleanContent.replace(/\[\/QUOTE_RECOMMENDATION\]/g, '');
+                  
+                  accumulatedText += cleanContent;
                   
                   // Update the streaming message immediately
                   setMessages(prev => prev.map(msg => 
@@ -189,7 +196,7 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                       price: recommendation.estimatedHours && recommendation.complexity 
                         ? calculatePrice(recommendation.estimatedHours, recommendation.complexity)
                         : 0,
-                      id: Date.now()
+                      id: Date.now() + Math.random() // Einzigartige ID für mehrere Items
                     };
                     onAddQuoteItem(quoteItem);
                   }, 1000);
