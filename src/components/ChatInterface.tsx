@@ -21,19 +21,18 @@ interface ChatInterfaceProps {
 const sanitizeInput = (input: string): string => {
   return input
     .trim()
-    .replace(/[<>\"'&]/g, '') // Remove potentially dangerous characters
-    .substring(0, 2000); // Increased length limit
+    .replace(/[<>\"'&]/g, '')
+    .substring(0, 2000);
 };
 
 // Rate limiting configuration
 const RATE_LIMIT = {
   maxMessages: 10,
-  timeWindow: 60000, // 1 minute
+  timeWindow: 60000,
 };
 
 // Markdown-to-JSX renderer for basic formatting
 const renderMarkdown = (text: string) => {
-  // Convert **bold** to JSX
   const boldRegex = /\*\*(.*?)\*\*/g;
   const parts = text.split(boldRegex);
   
@@ -47,7 +46,7 @@ const renderMarkdown = (text: string) => {
 
 // Calculate price based on estimated hours and complexity
 const calculatePrice = (estimatedHours: number, complexity: string): number => {
-  const baseHourlyRate = 120; // €120 per hour base rate
+  const baseHourlyRate = 120;
   const complexityMultipliers = {
     'niedrig': 1.0,
     'mittel': 1.3,
@@ -101,13 +100,11 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
 
   const getStreamingAIResponse = async (userMessage: string) => {
     try {
-      // Bereite die Nachrichtenhistorie für die KI vor
       const chatHistory = messages.filter(msg => !msg.isStreaming).map(msg => ({
         role: msg.isBot ? 'assistant' : 'user',
         content: msg.text
       }));
       
-      // Füge die neue Benutzernachricht hinzu
       chatHistory.push({
         role: 'user',
         content: userMessage
@@ -115,7 +112,6 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
 
       console.log('Sending streaming chat request to AI...');
       
-      // Handle streaming response using the correct Supabase function URL
       const response = await fetch(`https://rtxvbdvhzjsktmhdfdfv.supabase.co/functions/v1/chat-with-ai`, {
         method: 'POST',
         headers: {
@@ -160,13 +156,10 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
             if (line.startsWith('data: ')) {
               const data = line.slice(6);
               if (data === '[DONE]') {
-                // Remove any remaining QUOTE_RECOMMENDATION tags from final text
-                const cleanFinalText = accumulatedText.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '').trim();
-                
                 // Finalize the message
                 setMessages(prev => prev.map(msg => 
                   msg.id === streamingMessageId 
-                    ? { ...msg, text: cleanFinalText, isStreaming: false }
+                    ? { ...msg, text: accumulatedText.trim(), isStreaming: false }
                     : msg
                 ));
                 return;
@@ -176,52 +169,19 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
                 const parsed = JSON.parse(data);
                 
                 if (parsed.type === 'content') {
-                  // Filter out QUOTE_RECOMMENDATION tags from streamed content
-                  const cleanContent = parsed.data.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
+                  // Always accumulate content for real-time streaming
+                  accumulatedText += parsed.data;
                   
-                  if (cleanContent) {
-                    accumulatedText += cleanContent;
-                    // Update the streaming message
-                    setMessages(prev => prev.map(msg => 
-                      msg.id === streamingMessageId 
-                        ? { ...msg, text: accumulatedText }
-                        : msg
-                    ));
-                  }
-                  
-                  // Always accumulate the full content (including tags) for quote processing
-                  const fullContent = parsed.data;
-                  
-                  // Check for complete quote recommendations in the accumulated content
-                  const quoteMatch = fullContent.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/);
-                  if (quoteMatch) {
-                    try {
-                      const quoteRecommendation = JSON.parse(quoteMatch[1]);
-                      console.log('Quote recommendation found in content:', quoteRecommendation);
-                      
-                      setTimeout(() => {
-                        // Transform AI recommendation to match QuoteItem interface
-                        const quoteItem = {
-                          service: quoteRecommendation.service,
-                          description: quoteRecommendation.description,
-                          estimatedHours: quoteRecommendation.estimatedHours,
-                          complexity: quoteRecommendation.complexity,
-                          price: quoteRecommendation.estimatedHours && quoteRecommendation.complexity 
-                            ? calculatePrice(quoteRecommendation.estimatedHours, quoteRecommendation.complexity)
-                            : 0,
-                          id: Date.now()
-                        };
-                        onAddQuoteItem(quoteItem);
-                      }, 1000);
-                    } catch (e) {
-                      console.error('Failed to parse quote recommendation from content:', e);
-                    }
-                  }
+                  // Update the streaming message immediately
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === streamingMessageId 
+                      ? { ...msg, text: accumulatedText }
+                      : msg
+                  ));
                 } else if (parsed.type === 'quote_recommendation') {
                   console.log('Adding quote recommendation:', parsed.data);
                   setTimeout(() => {
                     const recommendation = parsed.data;
-                    // Transform AI recommendation to match QuoteItem interface
                     const quoteItem = {
                       service: recommendation.service,
                       description: recommendation.description,

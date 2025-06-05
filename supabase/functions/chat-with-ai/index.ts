@@ -29,7 +29,7 @@ serve(async (req) => {
 
     console.log('Chat request received with', messages.length, 'messages');
 
-    // System prompt - fokussiert auf Beratung ohne Preise
+    // Improved system prompt - less aggressive about creating quotes
     const systemPrompt = `Du bist ein professioneller KI-Berater von Digitalwert, einem Unternehmen für digitale Lösungen. Du hilfst Kunden bei:
 
 - Webauftritten und Corporate Websites
@@ -44,10 +44,19 @@ WICHTIGE REGELN:
 3. Stelle konkrete Nachfragen zu Anforderungen
 4. ERWÄHNE NIEMALS konkrete Preise - das übernimmt das Angebotssystem
 5. Fokussiere dich auf technische Beratung und Lösungsfindung
-6. Wenn ein Kunde Interesse an einem Service zeigt, gib eine JSON-Empfehlung am Ende deiner Antwort in diesem Format:
-   [QUOTE_RECOMMENDATION]{"service": "Service Name", "description": "Detaillierte Beschreibung der Leistung", "estimatedHours": 40, "complexity": "medium"}[/QUOTE_RECOMMENDATION]
 
-Analysiere die Kundenanfrage sorgfältig und empfehle passende Services nur wenn der Kunde konkretes Interesse zeigt.`;
+ANGEBOTSERSTELLUNG - NUR WENN ALLE KRITERIEN ERFÜLLT SIND:
+- Der Kunde hat bereits konkrete Anforderungen genannt
+- Es wurden mindestens 2-3 Nachrichten ausgetauscht
+- Der Kunde zeigt deutliches Interesse an einer Umsetzung
+- Alle wichtigen Details sind geklärt
+
+Wenn ALLE Kriterien erfüllt sind, gib eine JSON-Empfehlung am Ende deiner Antwort:
+[QUOTE_RECOMMENDATION]{"service": "Service Name", "description": "Detaillierte Beschreibung", "estimatedHours": 40, "complexity": "mittel"}[/QUOTE_RECOMMENDATION]
+
+Komplexitätsstufen: "niedrig", "mittel", "hoch", "sehr hoch"
+
+Analysiere die Konversation sorgfältig und erstelle nur dann ein Angebot, wenn der Kunde wirklich bereit ist.`;
 
     const fullMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -65,7 +74,7 @@ Analysiere die Kundenanfrage sorgfältig und empfehle passende Services nur wenn
         messages: fullMessages,
         temperature: 0.7,
         max_tokens: 1000,
-        stream: true, // Enable streaming
+        stream: true,
       }),
     });
 
@@ -73,7 +82,7 @@ Analysiere die Kundenanfrage sorgfältig und empfehle passende Services nur wenn
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    // Create a ReadableStream for streaming response
+    // Create a ReadableStream for real streaming
     const stream = new ReadableStream({
       async start(controller) {
         const reader = response.body?.getReader();
@@ -95,23 +104,20 @@ Analysiere die Kundenanfrage sorgfältig und empfehle passende Services nur wenn
                 const data = line.slice(6);
                 if (data === '[DONE]') {
                   // Process final response for quote recommendations
-                  let quoteRecommendation = null;
                   const quoteMatch = fullResponse.match(/\[QUOTE_RECOMMENDATION\](.*?)\[\/QUOTE_RECOMMENDATION\]/);
                   if (quoteMatch) {
                     try {
-                      quoteRecommendation = JSON.parse(quoteMatch[1]);
+                      const quoteRecommendation = JSON.parse(quoteMatch[1]);
                       console.log('Quote recommendation extracted:', quoteRecommendation);
+                      
+                      // Send quote recommendation separately
+                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                        type: 'quote_recommendation',
+                        data: quoteRecommendation
+                      })}\n\n`));
                     } catch (e) {
                       console.error('Failed to parse quote recommendation:', e);
                     }
-                  }
-
-                  // Send final message with quote recommendation
-                  if (quoteRecommendation) {
-                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                      type: 'quote_recommendation',
-                      data: quoteRecommendation
-                    })}\n\n`));
                   }
                   
                   controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
@@ -124,14 +130,15 @@ Analysiere die Kundenanfrage sorgfältig und empfehle passende Services nur wenn
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (content) {
                     fullResponse += content;
-                    // Remove quote recommendation tags from streamed content
+                    
+                    // Stream content immediately, filtering out quote tags
                     const cleanContent = content.replace(/\[QUOTE_RECOMMENDATION\].*?\[\/QUOTE_RECOMMENDATION\]/g, '');
-                    if (cleanContent) {
-                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                        type: 'content',
-                        data: cleanContent
-                      })}\n\n`));
-                    }
+                    
+                    // Always send content, even if empty after filtering
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                      type: 'content',
+                      data: cleanContent
+                    })}\n\n`));
                   }
                 } catch (e) {
                   // Skip malformed JSON

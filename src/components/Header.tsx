@@ -1,8 +1,8 @@
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Settings, User, LogOut, BarChart3 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { LogIn, LogOut, User, Settings } from 'lucide-react';
+import { AdminPanel } from './AdminPanel';
 
 interface HeaderProps {
   user: any;
@@ -12,68 +12,63 @@ interface HeaderProps {
 }
 
 export function Header({ user, onLoginOpen, onAdminOpen, onLogout }: HeaderProps) {
-  const { signOut, profile } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/');
-  };
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
 
   return (
-    <header className="bg-digitalwert-background-light/80 backdrop-blur-sm shadow-lg border-b border-digitalwert-background-lighter">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 bg-gradient-to-r from-digitalwert-primary to-digitalwert-accent-light rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">D</span>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-digitalwert-primary to-digitalwert-accent-light bg-clip-text text-transparent">
-                Digitalwert
-              </h1>
-              <p className="text-sm text-slate-400">Agentur für digitale Wertschöpfung</p>
-            </div>
+    <>
+      <header className="border-b border-digitalwert-background-lighter bg-digitalwert-background/80 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-digitalwert-primary to-digitalwert-accent bg-clip-text text-transparent">
+              Digitalwert
+            </h1>
           </div>
-
-          <div className="flex items-center space-x-4">
+          
+          <nav className="flex items-center gap-4">
             {user ? (
               <>
-                <span className="text-sm text-slate-300">
-                  Willkommen, {profile?.full_name || user.email}
-                </span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => navigate('/dashboard')}
-                  className="text-slate-300 hover:text-white hover:bg-digitalwert-background-lighter"
+                <div className="flex items-center gap-2 text-slate-300">
+                  <User className="w-4 h-4" />
+                  <span className="text-sm">{user.email}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsAdminOpen(true)}
+                  className="text-slate-300 hover:text-white"
                 >
-                  <BarChart3 className="w-4 h-4 mr-2" />
-                  Dashboard
+                  <Settings className="w-4 h-4 mr-2" />
+                  Admin
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleLogout} 
-                  className="text-slate-300 hover:text-white hover:bg-digitalwert-background-lighter"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onLogout}
+                  className="text-slate-300 hover:text-white"
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   Abmelden
                 </Button>
               </>
             ) : (
-              <Button 
-                variant="outline" 
-                onClick={onLoginOpen} 
-                className="border-digitalwert-primary text-digitalwert-primary hover:bg-digitalwert-primary hover:text-white"
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onLoginOpen}
+                className="text-slate-300 hover:text-white"
               >
-                <User className="w-4 h-4 mr-2" />
+                <LogIn className="w-4 h-4 mr-2" />
                 Anmelden
               </Button>
             )}
-          </div>
+          </nav>
         </div>
-      </div>
-    </header>
+      </header>
+
+      <AdminPanel 
+        isOpen={isAdminOpen}
+        onClose={() => setIsAdminOpen(false)}
+      />
+    </>
   );
 }
