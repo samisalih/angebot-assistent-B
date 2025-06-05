@@ -103,21 +103,12 @@ export function ChatInterface({ onAddQuoteItem }: ChatInterfaceProps) {
 
       console.log('Sending streaming chat request to AI...');
       
-      const { data, error } = await supabase.functions.invoke('chat-with-ai', {
-        body: { messages: chatHistory }
-      });
-
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw error;
-      }
-
-      // Handle streaming response
+      // Handle streaming response using the correct Supabase function URL
       const response = await fetch(`https://rtxvbdvhzjsktmhdfdfv.supabase.co/functions/v1/chat-with-ai`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0eHZiZHZoempza3RtaGRmZGZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMzAwNzAsImV4cCI6MjA2NDYwNjA3MH0.JJpcbEVIvKmA2Z-nG231PF-R1O8NTh2zjEolm_vzxn0`,
         },
         body: JSON.stringify({ messages: chatHistory })
       });
